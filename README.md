@@ -55,14 +55,14 @@ env, err := cel.NewEnv(
         decls.NewIdent("group", decls.String, nil)))
 ```
 
-That's it, the environment is ready to be use for parsing and type-checking.
+That's it. The environment is ready to be use for parsing and type-checking.
 CEL supports all the usual primitive types in addition to lists, maps, as well
 as first-class support for JSON and Protocol Buffers.
 
 ### Parse and Check
 
 The parsing phase indicates whether the expression is syntactically valid and
-expands any macros present within the environment. Parsing and checking is
+expands any macros present within the environment. Parsing and checking are
 more computationally expensive than evaluation, and it is recommended that
 expressions be parsed and checked ahead of time.
 
@@ -84,7 +84,7 @@ if err != nil {
 The `cel.Program` generated at the end of parse and check is stateless,
 thread-safe, and cachable.
 
-Type-checking in an optional, but strongly encouraged step that can reject some
+Type-checking in an optional, but strongly encouraged, step that can reject some
 semantically invalid expressions using static analysis. Additionally, the check
 produces metadata which can improve function invocation performance and object
 field selection at evaluation-time.
