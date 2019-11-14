@@ -91,7 +91,7 @@ field selection at evaluation-time.
 
 #### Macros
 
-Macros are enabled by default and may be disabled. Macros were introduced to
+Macros are optional but enabled by default. Macros were introduced to
 support optional CEL features that might not be desired in all use cases
 without the syntactic burden and complexity such features might desire if
 they were part of the core CEL syntax. Macros are expanded at parse time and
