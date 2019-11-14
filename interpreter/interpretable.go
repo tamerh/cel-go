@@ -70,35 +70,6 @@ func (id *evalIdent) Eval(ctx Activation) ref.Val {
 
 }
 
-type evalSelect struct {
-	id        int64
-	op        Interpretable
-	field     types.String
-	resolveID func(Activation) (ref.Val, bool)
-}
-
-// ID implements the Interpretable interface method.
-func (sel *evalSelect) ID() int64 {
-	return sel.id
-}
-
-// Eval implements the Interpretable interface method.
-func (sel *evalSelect) Eval(ctx Activation) ref.Val {
-	// If the select is actually a qualified identifier return.
-	if sel.resolveID != nil {
-		if resolve, found := sel.resolveID(ctx); found {
-			return resolve
-		}
-	}
-	// Otherwise, evaluate the operand and select the field.
-	obj := sel.op.Eval(ctx)
-	indexer, ok := obj.(traits.Indexer)
-	if !ok {
-		return types.ValOrErr(obj, "invalid type for field selection.")
-	}
-	return indexer.Get(sel.field)
-}
-
 type evalTestOnly struct {
 	id    int64
 	op    Interpretable
@@ -760,4 +731,27 @@ func (fold *evalExhaustiveFold) Eval(ctx Activation) ref.Val {
 	varActivationPool.Put(iterCtx)
 	varActivationPool.Put(accuCtx)
 	return res
+}
+
+type evalAttr struct {
+	adapter  ref.TypeAdapter
+	resolver Resolver
+	attr     Attribute
+}
+
+func (a *evalAttr) ID() int64 {
+	return a.attr.ID()
+}
+
+func (a *evalAttr) Eval(ctx Activation) ref.Val {
+	v, err := a.attr.Resolve(ctx, a.resolver)
+	if err != nil {
+		return types.NewErr(err.Error())
+	}
+	return a.adapter.NativeToValue(v)
+}
+
+func (a *evalAttr) Qualify(id int64, qual interface{}) error {
+	_, err := a.attr.Qualify(id, qual)
+	return err
 }

@@ -27,6 +27,8 @@ import (
 //
 // An Activation is the primary mechanism by which a caller supplies input into a CEL program.
 type Activation interface {
+	FindName(string) (interface{}, bool)
+
 	// ResolveName returns a value from the activation by qualified name, or false if the name
 	// could not be found.
 	ResolveName(name string) (ref.Val, bool)
@@ -97,22 +99,18 @@ func (a *mapActivation) Parent() Activation {
 	return nil
 }
 
+func (a *mapActivation) FindName(name string) (interface{}, bool) {
+	obj, found := a.bindings[name]
+	return obj, found
+}
+
 // ResolveName implements the Activation interface method.
 func (a *mapActivation) ResolveName(name string) (ref.Val, bool) {
-	if object, found := a.bindings[name]; found {
-		switch object.(type) {
-		// Resolve a lazily bound value.
-		case func() ref.Val:
-			val := object.(func() ref.Val)()
-			val = a.adapter.NativeToValue(val)
-			a.bindings[name] = val
-			return val, true
-		// Otherwise, return the bound value.
-		default:
-			return a.adapter.NativeToValue(object), true
-		}
+	val, found := a.FindName(name)
+	if !found {
+		return nil, false
 	}
-	return nil, false
+	return a.adapter.NativeToValue(val), true
 }
 
 // hierarchicalActivation which implements Activation and contains a parent and
@@ -125,6 +123,13 @@ type hierarchicalActivation struct {
 // Parent implements the Activation interface method.
 func (a *hierarchicalActivation) Parent() Activation {
 	return a.parent
+}
+
+func (a *hierarchicalActivation) FindName(name string) (interface{}, bool) {
+	if obj, found := a.child.FindName(name); found {
+		return obj, found
+	}
+	return a.parent.FindName(name)
 }
 
 // ResolveName implements the Activation interface method.
@@ -162,6 +167,13 @@ type varActivation struct {
 // Parent implements the Activation interface method.
 func (v *varActivation) Parent() Activation {
 	return v.parent
+}
+
+func (v *varActivation) FindName(name string) (interface{}, bool) {
+	if name == v.name {
+		return v.val, true
+	}
+	return v.parent.FindName(name)
 }
 
 // ResolveName implements the Activation interface method.
