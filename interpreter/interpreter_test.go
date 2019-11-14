@@ -717,7 +717,10 @@ func TestInterpreter(t *testing.T) {
 				"track":      TrackState(state),
 			}
 			for mode, opt := range opts {
-				prg, vars, _ = program(&tc, opt)
+				prg, vars, err = program(&tc, opt)
+				if err != nil {
+					tt.Fatal(err)
+				}
 				tt.Run(mode, func(ttt *testing.T) {
 					got := prg.Eval(vars)
 					_, expectUnk := want.(types.Unknown)

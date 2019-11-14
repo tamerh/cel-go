@@ -205,10 +205,9 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 	if err != nil {
 		return nil, err
 	}
-	attr, isAttr := op.(*evalAttr)
+	attr, isAttr := op.(instAttr)
 	if isAttr {
-		err := attr.Qualify(expr.Id, sel.Field)
-		return attr, err
+		return attr.Qualify(expr.Id, sel.Field)
 	}
 	relAttr := RelativeAttribute(op.ID(), op)
 	_, err = relAttr.Qualify(expr.Id, sel.Field)
@@ -268,7 +267,7 @@ func (p *planner) planCall(expr *exprpb.Expr) (Interpretable, error) {
 	case operators.NotEquals:
 		return p.planCallNotEqual(expr, args)
 	case operators.Index:
-		// TODO: implement
+		return p.planCallIndex(expr, args)
 	}
 
 	// Otherwise, generate Interpretable calls specialized by argument count.
@@ -426,14 +425,56 @@ func (p *planner) planCallLogicalOr(expr *exprpb.Expr,
 // planCallConditional generates a conditional / ternary (c ? t : f) Interpretable.
 func (p *planner) planCallConditional(expr *exprpb.Expr,
 	args []Interpretable) (Interpretable, error) {
-	// TODO: test the true and false branches to determine whether
-	// this actually needs to be a ConditionalAttribute
-	return &evalConditional{
-		id:     expr.Id,
-		expr:   args[0],
-		truthy: args[1],
-		falsy:  args[2],
+	cond := args[0]
+
+	t := args[1]
+	var tAttr Attribute
+	truthyAttr, isTruthyAttr := t.(instAttr)
+	if isTruthyAttr {
+		tAttr = truthyAttr.Attr()
+	} else {
+		tAttr = RelativeAttribute(t.ID(), t)
+	}
+
+	f := args[2]
+	var fAttr Attribute
+	falsyAttr, isFalsyAttr := f.(instAttr)
+	if isFalsyAttr {
+		fAttr = falsyAttr.Attr()
+	} else {
+		fAttr = RelativeAttribute(f.ID(), f)
+	}
+
+	return &evalAttr{
+		adapter:  p.adapter,
+		resolver: p.resolver,
+		attr:     ConditionalAttribute(expr.Id, cond, tAttr, fAttr),
 	}, nil
+}
+
+// planCallIndex either extends an attribute with the argument to the index operation, or creates
+// a relative attribute based on the return of a function call or operation.
+func (p *planner) planCallIndex(expr *exprpb.Expr,
+	args []Interpretable) (Interpretable, error) {
+	op := args[0]
+	ind := args[1]
+	opAttr, isOpAttr := op.(instAttr)
+	if !isOpAttr {
+		opAttr = &evalAttr{
+			adapter:  p.adapter,
+			resolver: p.resolver,
+			attr:     RelativeAttribute(expr.Id, op),
+		}
+	}
+	indConst, isIndConst := ind.(instConst)
+	if isIndConst {
+		return opAttr.Qualify(indConst.ID(), indConst.Value())
+	}
+	indAttr, isIndAttr := ind.(instAttr)
+	if isIndAttr {
+		return opAttr.Qualify(indAttr.ID(), indAttr)
+	}
+	return nil, fmt.Errorf("unsupported index expression: %v", expr)
 }
 
 // planCreateList generates a list construction Interpretable.

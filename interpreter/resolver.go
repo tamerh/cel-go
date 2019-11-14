@@ -50,16 +50,16 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		isKey := false
 		isIndex := false
 		switch qual := quals[idx].(type) {
-		case *StringQualifier:
+		case *stringQualifier:
 			s = qual.Value
 			goto QualString
-		case *IntQualifier:
+		case *intQualifier:
 			i = qual.Value
 			goto QualInt
-		case *UintQualifier:
+		case *uintQualifier:
 			u = qual.Value
 			goto QualUint
-		case *BoolQualifier:
+		case *boolQualifier:
 			b = qual.Value
 			goto QualBool
 		case Attribute:

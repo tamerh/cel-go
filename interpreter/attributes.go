@@ -112,10 +112,10 @@ func (a *relativeAttribute) Resolve(vars Activation, res Resolver) (interface{},
 	return res.ResolveQualifiers(vars, v, a.qualifiers)
 }
 
-func ConditionalAttribute(id int64, cond Interpretable, t, f Attribute) Attribute {
+func ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute {
 	return &conditionalAttribute{
 		id:     id,
-		cond:   cond,
+		expr:   expr,
 		truthy: t,
 		falsy:  f,
 	}
@@ -123,7 +123,7 @@ func ConditionalAttribute(id int64, cond Interpretable, t, f Attribute) Attribut
 
 type conditionalAttribute struct {
 	id     int64
-	cond   Interpretable
+	expr   Interpretable
 	truthy Attribute
 	falsy  Attribute
 }
@@ -145,14 +145,18 @@ func (a *conditionalAttribute) Qualify(id int64, v interface{}) (Attribute, erro
 }
 
 func (a *conditionalAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
-	v := a.cond.Eval(vars)
+	v := a.expr.Eval(vars)
+	cond, isBool := v.(types.Bool)
+	if !isBool {
+		v = types.ValOrErr(v, "no such overload")
+	}
 	if types.IsError(v) {
 		return nil, v.Value().(error)
 	}
 	if types.IsUnknown(v) {
 		return v, nil
 	}
-	if v == types.True {
+	if cond {
 		return a.truthy.Resolve(vars, res)
 	}
 	return a.falsy.Resolve(vars, res)
@@ -227,13 +231,21 @@ func newQualifier(id int64, v interface{}) (Qualifier, error) {
 	case Attribute:
 		return val, nil
 	case string:
-		qual = &StringQualifier{id: id, Value: val}
+		qual = &stringQualifier{id: id, Value: val}
 	case int64:
-		qual = &IntQualifier{id: id, Value: val}
+		qual = &intQualifier{id: id, Value: val}
 	case uint64:
-		qual = &UintQualifier{id: id, Value: val}
+		qual = &uintQualifier{id: id, Value: val}
 	case bool:
-		qual = &BoolQualifier{id: id, Value: val}
+		qual = &boolQualifier{id: id, Value: val}
+	case types.String:
+		qual = &stringQualifier{id: id, Value: string(val)}
+	case types.Int:
+		qual = &intQualifier{id: id, Value: int64(val)}
+	case types.Uint:
+		qual = &uintQualifier{id: id, Value: uint64(val)}
+	case types.Bool:
+		qual = &boolQualifier{id: id, Value: bool(val)}
 	default:
 		return nil, fmt.Errorf("invalid qualifier type: %T", v)
 	}
@@ -244,39 +256,39 @@ type Qualifier interface {
 	ID() int64
 }
 
-type StringQualifier struct {
+type stringQualifier struct {
 	id    int64
 	Value string
 }
 
-func (q *StringQualifier) ID() int64 {
+func (q *stringQualifier) ID() int64 {
 	return q.id
 }
 
-type IntQualifier struct {
+type intQualifier struct {
 	id    int64
 	Value int64
 }
 
-func (q *IntQualifier) ID() int64 {
+func (q *intQualifier) ID() int64 {
 	return q.id
 }
 
-type UintQualifier struct {
+type uintQualifier struct {
 	id    int64
 	Value uint64
 }
 
-func (q *UintQualifier) ID() int64 {
+func (q *uintQualifier) ID() int64 {
 	return q.id
 }
 
-type BoolQualifier struct {
+type boolQualifier struct {
 	id    int64
 	Value bool
 }
 
-func (q *BoolQualifier) ID() int64 {
+func (q *boolQualifier) ID() int64 {
 	return q.id
 }
 

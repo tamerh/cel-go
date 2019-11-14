@@ -111,6 +111,10 @@ func (cons *evalConst) Eval(ctx Activation) ref.Val {
 	return cons.val
 }
 
+func (cons *evalConst) Value() ref.Val {
+	return cons.val
+}
+
 type evalOr struct {
 	id  int64
 	lhs Interpretable
@@ -197,31 +201,6 @@ func (and *evalAnd) Eval(ctx Activation) ref.Val {
 		return lVal
 	}
 	return types.ValOrErr(rVal, "no such overload")
-}
-
-type evalConditional struct {
-	id     int64
-	expr   Interpretable
-	truthy Interpretable
-	falsy  Interpretable
-}
-
-// ID implements the Interpretable interface method.
-func (cond *evalConditional) ID() int64 {
-	return cond.id
-}
-
-// Eval implements the Interpretable interface method.
-func (cond *evalConditional) Eval(ctx Activation) ref.Val {
-	condVal := cond.expr.Eval(ctx)
-	condBool, ok := condVal.(types.Bool)
-	if !ok {
-		return types.ValOrErr(condVal, "no such overload")
-	}
-	if condBool {
-		return cond.truthy.Eval(ctx)
-	}
-	return cond.falsy.Eval(ctx)
 }
 
 type evalEq struct {
@@ -573,6 +552,34 @@ func (e *evalWatch) Eval(ctx Activation) ref.Val {
 	return val
 }
 
+// evalWatchAttr describes a watcher of an attrInst interpretable.
+//
+// Since the watcher may be selected against at a later stage in program planning, the watcher
+// must implement the attrInst interface by proxy.
+type evalWatchAttr struct {
+	instAttr
+	observer evalObserver
+}
+
+// Eval implements the Interpretable interface method.
+func (e *evalWatchAttr) Eval(vars Activation) ref.Val {
+	val := e.instAttr.Eval(vars)
+	e.observer(e.instAttr.ID(), val)
+	return val
+}
+
+type evalWatchConst struct {
+	instConst
+	observer evalObserver
+}
+
+// Eval implements the Interpretable interface method.
+func (e *evalWatchConst) Eval(vars Activation) ref.Val {
+	val := e.instConst.Value()
+	e.observer(e.instConst.ID(), val)
+	return val
+}
+
 // evalExhaustiveOr is just like evalOr, but does not short-circuit argument evaluation.
 type evalExhaustiveOr struct {
 	id  int64
@@ -658,10 +665,10 @@ func (and *evalExhaustiveAnd) Eval(ctx Activation) ref.Val {
 // evalExhaustiveConditional is like evalConditional, but does not short-circuit argument
 // evaluation.
 type evalExhaustiveConditional struct {
-	id     int64
-	expr   Interpretable
-	truthy Interpretable
-	falsy  Interpretable
+	id       int64
+	adapter  ref.TypeAdapter
+	resolver Resolver
+	attr     *conditionalAttribute
 }
 
 // ID implements the Interpretable interface method.
@@ -671,17 +678,23 @@ func (cond *evalExhaustiveConditional) ID() int64 {
 
 // Eval implements the Interpretable interface method.
 func (cond *evalExhaustiveConditional) Eval(ctx Activation) ref.Val {
-	cVal := cond.expr.Eval(ctx)
-	tVal := cond.truthy.Eval(ctx)
-	fVal := cond.falsy.Eval(ctx)
+	cVal := cond.attr.expr.Eval(ctx)
+	tVal, err := cond.attr.truthy.Resolve(ctx, cond.resolver)
+	if err != nil {
+		return types.NewErr(err.Error())
+	}
+	fVal, err := cond.attr.falsy.Resolve(ctx, cond.resolver)
+	if err != nil {
+		return types.NewErr(err.Error())
+	}
 	cBool, ok := cVal.(types.Bool)
 	if !ok {
 		return types.ValOrErr(cVal, "no such overload")
 	}
 	if cBool {
-		return tVal
+		return cond.adapter.NativeToValue(tVal)
 	}
-	return fVal
+	return cond.adapter.NativeToValue(fVal)
 }
 
 // evalExhaustiveFold is like evalFold, but does not short-circuit argument evaluation.
@@ -733,6 +746,19 @@ func (fold *evalExhaustiveFold) Eval(ctx Activation) ref.Val {
 	return res
 }
 
+type instConst interface {
+	Interpretable
+	Value() ref.Val
+}
+
+type instAttr interface {
+	Interpretable
+	Attr() Attribute
+	Adapter() ref.TypeAdapter
+	Resolver() Resolver
+	Qualify(int64, interface{}) (instAttr, error)
+}
+
 type evalAttr struct {
 	adapter  ref.TypeAdapter
 	resolver Resolver
@@ -743,6 +769,18 @@ func (a *evalAttr) ID() int64 {
 	return a.attr.ID()
 }
 
+func (a *evalAttr) Attr() Attribute {
+	return a.attr
+}
+
+func (a *evalAttr) Adapter() ref.TypeAdapter {
+	return a.adapter
+}
+
+func (a *evalAttr) Resolver() Resolver {
+	return a.resolver
+}
+
 func (a *evalAttr) Eval(ctx Activation) ref.Val {
 	v, err := a.attr.Resolve(ctx, a.resolver)
 	if err != nil {
@@ -751,7 +789,7 @@ func (a *evalAttr) Eval(ctx Activation) ref.Val {
 	return a.adapter.NativeToValue(v)
 }
 
-func (a *evalAttr) Qualify(id int64, qual interface{}) error {
+func (a *evalAttr) Qualify(id int64, qual interface{}) (instAttr, error) {
 	_, err := a.attr.Qualify(id, qual)
-	return err
+	return a, err
 }
