@@ -204,9 +204,9 @@ func (p *protoTypeRegistry) registerAllTypes(fd *pb.FileDescription) error {
 //
 // This method should be the inverse of ref.Val.ConvertToNative.
 func (p *protoTypeRegistry) NativeToValue(value interface{}) ref.Val {
-	switch value.(type) {
+	switch v := value.(type) {
 	case ref.Val:
-		return DefaultTypeAdapter.NativeToValue(value)
+		return v
 	// Adapt common types and aggregate specializations using the DefaultTypeAdapter.
 	case bool, *bool,
 		float32, *float32, float64, *float64,
@@ -236,24 +236,22 @@ func (p *protoTypeRegistry) NativeToValue(value interface{}) ref.Val {
 		return DefaultTypeAdapter.NativeToValue(value)
 	// Override the Any type by ensuring that custom proto-types are considered on recursive calls.
 	case *anypb.Any:
-		val := value.(*anypb.Any)
-		if val == nil {
+		if v == nil {
 			return NewErr("unsupported type conversion: '%T'", value)
 		}
 		unpackedAny := ptypes.DynamicAny{}
-		if ptypes.UnmarshalAny(val, &unpackedAny) != nil {
-			return NewErr("unknown type: '%s'", val.GetTypeUrl())
+		if ptypes.UnmarshalAny(v, &unpackedAny) != nil {
+			return NewErr("unknown type: '%s'", v.GetTypeUrl())
 		}
 		return p.NativeToValue(unpackedAny.Message)
 	// Convert custom proto types to CEL values based on type's presence within the pb.Db.
 	case proto.Message:
-		pbVal := value.(proto.Message)
-		typeName := proto.MessageName(pbVal)
+		typeName := proto.MessageName(v)
 		td, err := p.pbdb.DescribeType(typeName)
 		if err != nil {
 			return NewErr("unknown type: '%s'", typeName)
 		}
-		return NewObject(p, td, pbVal)
+		return NewObject(p, td, v)
 	// Override default handling for list and maps to ensure that blends of Go + proto types
 	// are appropriately adapted on recursive calls or subsequent inspection of the aggregate
 	// value.

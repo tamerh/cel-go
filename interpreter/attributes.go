@@ -145,17 +145,26 @@ func (a *conditionalAttribute) Qualify(id int64, v interface{}) (Attribute, erro
 }
 
 func (a *conditionalAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
-	v := a.expr.Eval(vars)
-	cond, isBool := v.(types.Bool)
-	if isBool {
-		if cond {
-			return a.truthy.Resolve(vars, res)
+	var v interface{}
+	var err error
+	attr, isAttr := a.expr.(instAttr)
+	if isAttr {
+		v, err = attr.Attr().Resolve(vars, res)
+		if err != nil {
+			return nil, err
 		}
-		return a.falsy.Resolve(vars, res)
+	} else {
+		val := a.expr.Eval(vars)
+		if types.IsError(val) {
+			return nil, val.Value().(error)
+		}
+		v = val
 	}
-	v = types.ValOrErr(v, "no such overload")
-	if types.IsError(v) {
-		return nil, v.Value().(error)
+	if v == types.True || v == true {
+		return a.truthy.Resolve(vars, res)
+	}
+	if v == types.False || v == false {
+		return a.falsy.Resolve(vars, res)
 	}
 	return v, nil
 }

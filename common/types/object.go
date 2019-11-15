@@ -140,7 +140,7 @@ func (o *protoObj) Get(index ref.Val) ref.Val {
 	if !getter.IsValid() {
 		return NewErr("no such field '%s'", index)
 	}
-	refField := getter.Call([]reflect.Value{})[0]
+	refField := getter.Call(noArgs)[0]
 	if !refField.IsValid() {
 		return NewErr("no such field '%s'", index)
 	}
@@ -177,3 +177,7 @@ func getOrDefaultInstance(adapter ref.TypeAdapter,
 	}
 	return NewErr("no default value for field: %s", fd.Name())
 }
+
+var (
+	noArgs = []reflect.Value{}
+)

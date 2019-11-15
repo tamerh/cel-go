@@ -40,6 +40,7 @@ type typeMetadata struct {
 	fieldProperties *proto.StructProperties
 	reflectedType   *reflect.Type
 	reflectedVal    *reflect.Value
+	emptyVal        interface{}
 }
 
 // FieldCount returns the number of fields declared within the type.
@@ -70,11 +71,11 @@ func (td *TypeDescription) ReflectType() reflect.Type {
 
 // DefaultValue returns an empty instance of the proto message associated with the type.
 func (td *TypeDescription) DefaultValue() proto.Message {
-	refVal := td.getMetadata().reflectedVal
-	if refVal == nil {
+	val := td.getMetadata().emptyVal
+	if val == nil {
 		return nil
 	}
-	return (*refVal).Interface().(proto.Message)
+	return val.(proto.Message)
 }
 
 func (td *TypeDescription) getMetadata() *typeMetadata {
@@ -107,6 +108,7 @@ func (td *TypeDescription) makeMetadata() *typeMetadata {
 		}
 		refVal := reflect.New(elemType)
 		meta.reflectedVal = &refVal
+		meta.emptyVal = refVal.Interface()
 	}
 
 	fieldIndexMap := make(map[string]int)
