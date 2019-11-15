@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "activation.go",
+        "attributes.go",
         "decorators.go",
         "dispatcher.go",
         "evalstate.go",
@@ -16,6 +17,7 @@ go_library(
         "interpreter.go",
         "planner.go",
         "prune.go",
+        "resolver.go",
     ],
       importpath = "github.com/google/cel-go/interpreter",
     deps = [
