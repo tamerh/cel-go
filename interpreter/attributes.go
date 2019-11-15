@@ -231,21 +231,21 @@ func newQualifier(id int64, v interface{}) (Qualifier, error) {
 	case Attribute:
 		return val, nil
 	case string:
-		qual = &stringQualifier{id: id, Value: val}
+		qual = &stringQualifier{id: id, Value: val, CelValue: types.String(val)}
 	case int64:
-		qual = &intQualifier{id: id, Value: val}
+		qual = &intQualifier{id: id, Value: val, CelValue: types.Int(val)}
 	case uint64:
-		qual = &uintQualifier{id: id, Value: val}
+		qual = &uintQualifier{id: id, Value: val, CelValue: types.Uint(val)}
 	case bool:
-		qual = &boolQualifier{id: id, Value: val}
+		qual = &boolQualifier{id: id, Value: val, CelValue: types.Bool(val)}
 	case types.String:
-		qual = &stringQualifier{id: id, Value: string(val)}
+		qual = &stringQualifier{id: id, Value: string(val), CelValue: val}
 	case types.Int:
-		qual = &intQualifier{id: id, Value: int64(val)}
+		qual = &intQualifier{id: id, Value: int64(val), CelValue: val}
 	case types.Uint:
-		qual = &uintQualifier{id: id, Value: uint64(val)}
+		qual = &uintQualifier{id: id, Value: uint64(val), CelValue: val}
 	case types.Bool:
-		qual = &boolQualifier{id: id, Value: bool(val)}
+		qual = &boolQualifier{id: id, Value: bool(val), CelValue: val}
 	default:
 		return nil, fmt.Errorf("invalid qualifier type: %T", v)
 	}
@@ -257,8 +257,9 @@ type Qualifier interface {
 }
 
 type stringQualifier struct {
-	id    int64
-	Value string
+	id       int64
+	Value    string
+	CelValue ref.Val
 }
 
 func (q *stringQualifier) ID() int64 {
@@ -266,8 +267,9 @@ func (q *stringQualifier) ID() int64 {
 }
 
 type intQualifier struct {
-	id    int64
-	Value int64
+	id       int64
+	Value    int64
+	CelValue ref.Val
 }
 
 func (q *intQualifier) ID() int64 {
@@ -275,8 +277,9 @@ func (q *intQualifier) ID() int64 {
 }
 
 type uintQualifier struct {
-	id    int64
-	Value uint64
+	id       int64
+	Value    uint64
+	CelValue ref.Val
 }
 
 func (q *uintQualifier) ID() int64 {
@@ -284,8 +287,9 @@ func (q *uintQualifier) ID() int64 {
 }
 
 type boolQualifier struct {
-	id    int64
-	Value bool
+	id       int64
+	Value    bool
+	CelValue ref.Val
 }
 
 func (q *boolQualifier) ID() int64 {

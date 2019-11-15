@@ -45,6 +45,7 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 	var i int64
 	var u uint64
 	var b bool
+	var cVal ref.Val
 	for idx := 0; idx < len(quals); idx++ {
 		isMap := false
 		isKey := false
@@ -52,15 +53,19 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		switch qual := quals[idx].(type) {
 		case *stringQualifier:
 			s = qual.Value
+			cVal = qual.CelValue
 			goto QualString
 		case *intQualifier:
 			i = qual.Value
+			cVal = qual.CelValue
 			goto QualInt
 		case *uintQualifier:
 			u = qual.Value
+			cVal = qual.CelValue
 			goto QualUint
 		case *boolQualifier:
 			b = qual.Value
+			cVal = qual.CelValue
 			goto QualBool
 		case Attribute:
 			v, err := qual.Resolve(vars, res)
@@ -69,17 +74,37 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			}
 			// TODO: add ref.Val support
 			switch q := v.(type) {
+			case types.String:
+				s = string(q)
+				cVal = q
+				goto QualString
+			case types.Int:
+				i = int64(q)
+				cVal = q
+				goto QualInt
+			case types.Uint:
+				u = uint64(q)
+				cVal = q
+				goto QualUint
+			case types.Bool:
+				b = q == types.True
+				cVal = q
+				goto QualBool
 			case string:
 				s = q
+				cVal = types.String(s)
 				goto QualString
 			case int64:
 				i = q
+				cVal = types.Int(i)
 				goto QualInt
 			case uint64:
 				u = q
+				cVal = types.Uint(u)
 				goto QualUint
 			case bool:
 				b = q
+				cVal = types.Bool(b)
 				goto QualBool
 			default:
 				return nil, fmt.Errorf("unsupported attribute type: %T", q)
@@ -97,11 +122,32 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		case map[string]int:
 			isMap = true
 			obj, isKey = o[s]
+		case map[string]int32:
+			isMap = true
+			obj, isKey = o[s]
+		case map[string]int64:
+			isMap = true
+			obj, isKey = o[s]
+		case map[string]uint:
+			isMap = true
+			obj, isKey = o[s]
+		case map[string]uint32:
+			isMap = true
+			obj, isKey = o[s]
+		case map[string]uint64:
+			isMap = true
+			obj, isKey = o[s]
+		case map[string]float32:
+			isMap = true
+			obj, isKey = o[s]
+		case map[string]float64:
+			isMap = true
+			obj, isKey = o[s]
 		case map[string]bool:
 			isMap = true
 			obj, isKey = o[s]
 		default:
-			elem, err := res.refResolve(types.String(s), obj)
+			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
@@ -143,7 +189,27 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			if isIndex {
 				obj = o[i]
 			}
+		case []int32:
+			isIndex = i >= 0 && i < int64(len(o))
+			if isIndex {
+				obj = o[i]
+			}
+		case []int64:
+			isIndex = i >= 0 && i < int64(len(o))
+			if isIndex {
+				obj = o[i]
+			}
 		case []uint:
+			isIndex = i >= 0 && i < int64(len(o))
+			if isIndex {
+				obj = o[i]
+			}
+		case []uint32:
+			isIndex = i >= 0 && i < int64(len(o))
+			if isIndex {
+				obj = o[i]
+			}
+		case []uint64:
 			isIndex = i >= 0 && i < int64(len(o))
 			if isIndex {
 				obj = o[i]
@@ -164,7 +230,7 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 				obj = o[i]
 			}
 		default:
-			elem, err := res.refResolve(types.Int(i), obj)
+			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
@@ -209,7 +275,27 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			if isIndex {
 				obj = o[u]
 			}
+		case []int32:
+			isIndex = u >= 0 && u < uint64(len(o))
+			if isIndex {
+				obj = o[u]
+			}
+		case []int64:
+			isIndex = u >= 0 && u < uint64(len(o))
+			if isIndex {
+				obj = o[u]
+			}
 		case []uint:
+			isIndex = u >= 0 && u < uint64(len(o))
+			if isIndex {
+				obj = o[u]
+			}
+		case []uint32:
+			isIndex = u >= 0 && u < uint64(len(o))
+			if isIndex {
+				obj = o[u]
+			}
+		case []uint64:
 			isIndex = u >= 0 && u < uint64(len(o))
 			if isIndex {
 				obj = o[u]
@@ -230,7 +316,7 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 				obj = o[u]
 			}
 		default:
-			elem, err := res.refResolve(types.Uint(u), obj)
+			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
@@ -257,8 +343,22 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			obj, isKey = o[b]
 		case map[bool]int:
 			obj, isKey = o[b]
+		case map[bool]int32:
+			obj, isKey = o[b]
+		case map[bool]int64:
+			obj, isKey = o[b]
+		case map[bool]uint:
+			obj, isKey = o[b]
+		case map[bool]uint32:
+			obj, isKey = o[b]
+		case map[bool]uint64:
+			obj, isKey = o[b]
+		case map[bool]float32:
+			obj, isKey = o[b]
+		case map[bool]float64:
+			obj, isKey = o[b]
 		default:
-			elem, err := res.refResolve(types.Bool(b), obj)
+			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
@@ -279,13 +379,25 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 
 func (res *resolver) refResolve(idx ref.Val, obj interface{}) (ref.Val, error) {
 	celVal := res.adapter.NativeToValue(obj)
+	mapper, isMapper := celVal.(traits.Mapper)
+	if isMapper {
+		elem, found := mapper.Find(idx)
+		if !found {
+			return nil, fmt.Errorf("no such key: %v", idx)
+		}
+		if types.IsError(elem) {
+			return nil, elem.Value().(error)
+		}
+		return elem, nil
+	}
 	indexer, isIndexer := celVal.(traits.Indexer)
-	if !isIndexer {
-		return nil, errors.New("no such overload")
+	if isIndexer {
+		elem := indexer.Get(idx)
+		if types.IsError(elem) {
+			return nil, elem.Value().(error)
+		}
+		return elem, nil
 	}
-	elem := indexer.Get(idx)
-	if types.IsError(elem) {
-		return nil, elem.Value().(error)
-	}
-	return elem, nil
+	return nil, errors.New("no such overload")
+
 }
