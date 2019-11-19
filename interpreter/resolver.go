@@ -29,6 +29,10 @@ type Resolver interface {
 	ResolveQualifiers(Activation, interface{}, []Qualifier) (interface{}, error)
 }
 
+func NewResolver(a ref.TypeAdapter, p ref.TypeProvider) Resolver {
+	return &resolver{adapter: a, provider: p}
+}
+
 type resolver struct {
 	adapter  ref.TypeAdapter
 	provider ref.TypeProvider
@@ -399,5 +403,4 @@ func (res *resolver) refResolve(idx ref.Val, obj interface{}) (ref.Val, error) {
 		return elem, nil
 	}
 	return nil, errors.New("no such overload")
-
 }
