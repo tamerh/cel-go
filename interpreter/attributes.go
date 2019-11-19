@@ -15,6 +15,7 @@
 package interpreter
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/cel-go/common/types"
@@ -56,17 +57,23 @@ func (a *absoluteAttribute) Qualify(id int64, v interface{}) (Attribute, error) 
 
 func (a *absoluteAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	for _, nm := range a.namespaceNames {
-		if op, found := vars.ResolveName(nm); found {
+		op, found := vars.ResolveName(nm)
+		_, isUnk := op.(types.Unknown)
+		if found && !isUnk {
 			if len(a.qualifiers) == 0 {
 				return op, nil
 			}
 			return res.ResolveQualifiers(vars, op, a.qualifiers)
 		}
-		if typ, found := res.ResolveName(nm); found {
+		typ, found := res.ResolveName(nm)
+		if found {
 			if len(a.qualifiers) == 0 {
 				return typ, nil
 			}
 			return nil, fmt.Errorf("no such attribute: %v", typ)
+		}
+		if isUnk {
+			return types.Unknown{a.ID()}, nil
 		}
 	}
 	return nil, fmt.Errorf("no such attribute: %v", a)
@@ -166,7 +173,14 @@ func (a *conditionalAttribute) Resolve(vars Activation, res Resolver) (interface
 	if v == types.False || v == false {
 		return a.falsy.Resolve(vars, res)
 	}
-	return v, nil
+	rv, isRefVal := v.(ref.Val)
+	if !isRefVal {
+		return nil, errors.New("no such overload")
+	}
+	if types.IsUnknown(rv) {
+		return rv, nil
+	}
+	return nil, types.ValOrErr(rv, "no such overload").Value().(error)
 }
 
 func OneofAttribute(id int64, namespacedNames []string) Attribute {
@@ -218,14 +232,19 @@ func (a *oneofAttribute) Resolve(vars Activation, res Resolver) (interface{}, er
 	for _, attr := range a.attrs {
 		for _, nm := range attr.namespaceNames {
 			varVal, found := vars.ResolveName(nm)
-			if found {
+			_, isUnk := varVal.(types.Unknown)
+			if found && !isUnk {
 				return res.ResolveQualifiers(vars, varVal, attr.qualifiers)
 			}
-			if typ, found := res.ResolveName(nm); found {
+			typ, found := res.ResolveName(nm)
+			if found {
 				if len(attr.qualifiers) == 0 {
 					return typ, nil
 				}
 				return nil, fmt.Errorf("no such attribute: %v", typ)
+			}
+			if isUnk {
+				return types.Unknown{a.ID()}, nil
 			}
 		}
 	}

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 )
 
@@ -159,3 +160,32 @@ var (
 		},
 	}
 )
+
+func UnknownActivation() Activation {
+	a, _ := PartialActivation(EmptyActivation())
+	return a
+}
+
+func PartialActivation(bindings interface{}) (Activation, error) {
+	a, err := NewActivation(bindings)
+	if err != nil {
+		return nil, err
+	}
+	return &partActivation{known: a}, nil
+}
+
+type partActivation struct {
+	known Activation
+}
+
+func (a *partActivation) ResolveName(name string) (interface{}, bool) {
+	obj, found := a.known.ResolveName(name)
+	if found {
+		return obj, true
+	}
+	return types.Unknown{}, true
+}
+
+func (a *partActivation) Parent() Activation {
+	return a.known.Parent()
+}

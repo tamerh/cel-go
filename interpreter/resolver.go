@@ -76,8 +76,9 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			if err != nil {
 				return nil, err
 			}
-			// TODO: add ref.Val support
 			switch q := v.(type) {
+			case types.Unknown:
+				return q, nil
 			case types.String:
 				s = string(q)
 				cVal = q
@@ -150,13 +151,15 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		case map[string]bool:
 			isMap = true
 			obj, isKey = o[s]
+		case types.Unknown:
+			return o, nil
 		default:
 			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
 			if types.IsUnknown(elem) {
-				return elem, nil
+				return res.fmtUnknown(elem, quals[idx]), nil
 			}
 			obj = elem
 			isMap = true
@@ -233,13 +236,15 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			if isIndex {
 				obj = o[i]
 			}
+		case types.Unknown:
+			return o, nil
 		default:
 			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
 			if types.IsUnknown(elem) {
-				return elem, nil
+				return res.fmtUnknown(elem, quals[idx]), nil
 			}
 			isMap = true
 			isKey = true
@@ -319,13 +324,15 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			if isIndex {
 				obj = o[u]
 			}
+		case types.Unknown:
+			return o, nil
 		default:
 			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
 			if types.IsUnknown(elem) {
-				return elem, nil
+				return res.fmtUnknown(elem, quals[idx]), nil
 			}
 			isMap = true
 			isKey = true
@@ -361,13 +368,15 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 			obj, isKey = o[b]
 		case map[bool]float64:
 			obj, isKey = o[b]
+		case types.Unknown:
+			return o, nil
 		default:
 			elem, err := res.refResolve(cVal, obj)
 			if err != nil {
 				return nil, err
 			}
 			if types.IsUnknown(elem) {
-				return elem, nil
+				return res.fmtUnknown(elem, quals[idx]), nil
 			}
 			isMap = true
 			isKey = true
@@ -379,6 +388,14 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		continue
 	}
 	return obj, nil
+}
+
+func (res *resolver) fmtUnknown(elem ref.Val, qual Qualifier) ref.Val {
+	unk := elem.(types.Unknown)
+	if len(unk) == 0 {
+		return types.Unknown{qual.ID()}
+	}
+	return unk
 }
 
 func (res *resolver) refResolve(idx ref.Val, obj interface{}) (ref.Val, error) {

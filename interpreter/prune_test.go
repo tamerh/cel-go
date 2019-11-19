@@ -125,11 +125,11 @@ func TestPrune(t *testing.T) {
 		interpretable, _ := interp.NewUncheckedInterpretable(
 			pExpr.Expr,
 			ExhaustiveEval(state))
-		interpretable.Eval(EmptyActivation())
+		interpretable.Eval(UnknownActivation())
 		newExpr := PruneAst(pExpr.Expr, state)
 		actual := debug.ToDebugString(newExpr)
 		if !test.Compare(actual, tst.P) {
-			t.Fatalf("prune[%d], diff: %s", i, test.DiffMessage("structure", actual, tst.P))
+			t.Errorf("prune[%d], diff: %s", i, test.DiffMessage("structure", actual, tst.P))
 		}
 	}
 }

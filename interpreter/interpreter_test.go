@@ -902,7 +902,7 @@ func TestInterpreter_MissingIdentInSelect(t *testing.T) {
 
 	interp := NewStandardInterpreter(packages.NewPackage("test"), reg, reg, res)
 	i, _ := interp.NewInterpretable(checked)
-	vars := EmptyActivation()
+	vars := UnknownActivation()
 	result := i.Eval(vars)
 	// TODO: When Issue #190 is fixed, this result should be an error.
 	if !types.IsUnknown(result) {
