@@ -24,7 +24,7 @@ import (
 )
 
 type Resolver interface {
-	FindName(name string) (interface{}, bool)
+	ResolveName(name string) (interface{}, bool)
 
 	ResolveQualifiers(Activation, interface{}, []Qualifier) (interface{}, error)
 }
@@ -38,7 +38,7 @@ type resolver struct {
 	provider ref.TypeProvider
 }
 
-func (res *resolver) FindName(name string) (interface{}, bool) {
+func (res *resolver) ResolveName(name string) (interface{}, bool) {
 	return res.provider.FindIdent(name)
 }
 

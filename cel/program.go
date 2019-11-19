@@ -90,7 +90,7 @@ type progGen struct {
 func newProgram(e *env, ast Ast, opts ...ProgramOption) (Program, error) {
 	// Build the dispatcher, interpreter, and default program value.
 	disp := interpreter.NewDispatcher()
-	interp := interpreter.NewInterpreter(disp, e.pkg, e.provider, e.adapter)
+	interp := interpreter.NewInterpreter(disp, e.pkg, e.provider, e.adapter, e.resolver)
 	p := &prog{
 		env:         e,
 		dispatcher:  disp,
@@ -202,7 +202,7 @@ func (p *prog) Eval(input interface{}) (v ref.Val, det EvalDetails, err error) {
 		}
 	}()
 	// Build a hierarchical activation if there are default vars set.
-	vars, err := interpreter.NewAdaptingActivation(p.adapter, input)
+	vars, err := interpreter.NewActivation(input)
 	if err != nil {
 		return
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/google/cel-go/common/packages"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/interpreter/functions"
 	"github.com/google/cel-go/parser"
 
@@ -133,6 +134,12 @@ func (e *env) configure(opts ...EnvOption) (Env, error) {
 			return nil, err
 		}
 	}
+
+	// Ensure the default resolver is set after the adapter and provider are configured.
+	if e.resolver == nil {
+		e.resolver = interpreter.NewResolver(e.adapter, e.provider)
+	}
+
 	// Construct the internal checker env, erroring if there is an issue adding the declarations.
 	ce := checker.NewEnv(e.pkg, e.provider)
 	ce.EnableDynamicAggregateLiterals(e.enableDynamicAggregateLiterals)
@@ -188,6 +195,7 @@ type env struct {
 	pkg          packages.Packager
 	provider     ref.TypeProvider
 	adapter      ref.TypeAdapter
+	resolver     interpreter.Resolver
 	chk          *checker.Env
 	// environment options, true by default.
 	enableBuiltins                 bool

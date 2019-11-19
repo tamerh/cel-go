@@ -27,6 +27,10 @@ func TestNewActivation(t *testing.T) {
 	}
 }
 
+func TestActivation_LazyVariable(t *testing.T) {
+
+}
+
 func TestHierarchicalActivation(t *testing.T) {
 	// compose a parent with more properties than the child
 	parent, _ := NewActivation(map[string]interface{}{
@@ -51,39 +55,5 @@ func TestHierarchicalActivation(t *testing.T) {
 	// Resolve the child only value.
 	if val, found := combined.ResolveName("c"); !found || val.(types.String) != "universe" {
 		t.Error("Activation failed to resolve child value of 'c'")
-	}
-}
-
-func TestActivation_NilValue(t *testing.T) {
-	var ptr *string
-	var fun *func()
-	a, _ := NewActivation(map[string]interface{}{
-		"nil": nil,  // plain old nil
-		"ptr": ptr,  // nil pointer to a supported type
-		"fun": fun}) // nil pointer to an unknown type
-	if v, found := a.ResolveName("nil"); !found || v != types.NullValue {
-		t.Errorf("Got '%v', wanted 'null'", v)
-	}
-	if v, _ := a.ResolveName("ptr"); !types.IsError(v) {
-		t.Errorf("Got '%v', wanted error", v)
-	}
-	if v, _ := a.ResolveName("fun"); !types.IsError(v) {
-		t.Errorf("Got '%v', wanted error", v)
-	}
-}
-
-func TestAdaptingActivation_NilValue(t *testing.T) {
-	var ptr *types.String
-	a, _ := NewAdaptingActivation(types.NewRegistry(), map[string]interface{}{
-		"nil": nil,
-		"ptr": ptr})
-	if v, found := a.ResolveName("nil"); !found || v != types.NullValue {
-		t.Errorf("Got '%v', wanted 'null'", v)
-	}
-	if v, _ := a.ResolveName("ptr"); !types.IsError(v) {
-		t.Errorf("Got '%v', wanted error", v)
-	}
-	if v, found := a.ResolveName("missing"); found {
-		t.Errorf("Got '%v', wanted not found", v)
 	}
 }

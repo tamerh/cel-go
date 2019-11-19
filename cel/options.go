@@ -212,7 +212,7 @@ func Functions(funcs ...*functions.Overload) ProgramOption {
 func Globals(vars interface{}) ProgramOption {
 	return func(p *prog) (*prog, error) {
 		defaultVars, err :=
-			interpreter.NewAdaptingActivation(p.adapter, vars)
+			interpreter.NewActivation(vars)
 		if err != nil {
 			return nil, err
 		}

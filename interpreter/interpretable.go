@@ -34,42 +34,6 @@ type Interpretable interface {
 
 // Core Interpretable implementations used during the program planning phase.
 
-type evalIdent struct {
-	id        int64
-	name      string
-	provider  ref.TypeProvider
-	resolveID func(Activation) (ref.Val, bool)
-}
-
-// ID implements the Interpretable interface method.
-func (id *evalIdent) ID() int64 {
-	return id.id
-}
-
-// Eval implements the Interpretable interface method.
-func (id *evalIdent) Eval(ctx Activation) ref.Val {
-	idName := id.name
-	if id.resolveID != nil {
-		// When the resolveID function is non-nil, the name could be relative
-		// to the container.
-		if val, found := id.resolveID(ctx); found {
-			return val
-		}
-	} else {
-		// Resolve the simple name directly as a type or ident.
-		val, found := ctx.ResolveName(idName)
-		if found {
-			return val
-		}
-		typeVal, found := id.provider.FindIdent(idName)
-		if found {
-			return typeVal
-		}
-	}
-	return types.Unknown{id.id}
-
-}
-
 type evalTestOnly struct {
 	id    int64
 	op    Interpretable

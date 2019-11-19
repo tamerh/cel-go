@@ -56,13 +56,13 @@ func (a *absoluteAttribute) Qualify(id int64, v interface{}) (Attribute, error) 
 
 func (a *absoluteAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	for _, nm := range a.namespaceNames {
-		if op, found := vars.FindName(nm); found {
+		if op, found := vars.ResolveName(nm); found {
 			if len(a.qualifiers) == 0 {
 				return op, nil
 			}
 			return res.ResolveQualifiers(vars, op, a.qualifiers)
 		}
-		if typ, found := res.FindName(nm); found {
+		if typ, found := res.ResolveName(nm); found {
 			if len(a.qualifiers) == 0 {
 				return typ, nil
 			}
@@ -217,11 +217,11 @@ func (a *oneofAttribute) Qualify(id int64, v interface{}) (Attribute, error) {
 func (a *oneofAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	for _, attr := range a.attrs {
 		for _, nm := range attr.namespaceNames {
-			varVal, found := vars.FindName(nm)
+			varVal, found := vars.ResolveName(nm)
 			if found {
 				return res.ResolveQualifiers(vars, varVal, attr.qualifiers)
 			}
-			if typ, found := res.FindName(nm); found {
+			if typ, found := res.ResolveName(nm); found {
 				if len(attr.qualifiers) == 0 {
 					return typ, nil
 				}

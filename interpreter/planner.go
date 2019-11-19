@@ -468,7 +468,7 @@ func (p *planner) planCallIndex(expr *exprpb.Expr,
 	}
 	indAttr, isIndAttr := ind.(instAttr)
 	if isIndAttr {
-		return opAttr.Qualify(indAttr.ID(), indAttr)
+		return opAttr.Qualify(indAttr.ID(), indAttr.Attr())
 	}
 	return nil, fmt.Errorf("unsupported index expression: %v", expr)
 }
@@ -645,19 +645,4 @@ func (p *planner) getQualifiedID(sel *exprpb.Expr_Select) (string, bool) {
 		}
 	}
 	return ident, validIdent
-}
-
-// idResolver returns a function that resolves an identifier to its appropriate namespace.
-func (p *planner) idResolver(ident string) func(Activation) (ref.Val, bool) {
-	return func(ctx Activation) (ref.Val, bool) {
-		for _, id := range p.pkg.ResolveCandidateNames(ident) {
-			if object, found := ctx.ResolveName(id); found {
-				return object, found
-			}
-			if typeIdent, found := p.provider.FindIdent(id); found {
-				return typeIdent, found
-			}
-		}
-		return nil, false
-	}
 }
