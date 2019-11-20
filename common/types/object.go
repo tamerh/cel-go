@@ -43,13 +43,14 @@ type protoObj struct {
 // Note:  only uses default Db.
 func NewObject(adapter ref.TypeAdapter,
 	typeDesc *pb.TypeDescription,
+	typeValue *TypeValue,
 	value proto.Message) ref.Val {
 	return &protoObj{
 		TypeAdapter: adapter,
 		value:       value,
 		refValue:    reflect.ValueOf(value),
 		typeDesc:    typeDesc,
-		typeValue:   NewObjectTypeValue(typeDesc.Name())}
+		typeValue:   typeValue}
 }
 
 func (o *protoObj) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
@@ -108,22 +109,17 @@ func (o *protoObj) IsSet(field ref.Val) ref.Val {
 		return ValOrErr(field, "no such overload")
 	}
 	protoFieldStr := string(protoFieldName)
-	f, found := o.typeDesc.FieldByName(protoFieldStr)
+	fd, found := o.typeDesc.FieldByName(protoFieldStr)
 	if !found {
 		return NewErr("no such field '%s'", field)
 	}
-	if !f.SupportsPresence() {
+	if !fd.SupportsPresence() {
 		return NewErr("field does not support presence testing.")
 	}
-	getter := o.refValue.MethodByName(f.GetterName())
-	if !getter.IsValid() {
-		return NewErr("no such field '%s'", field)
+	if fd.IsSetOn(o.refValue) {
+		return True
 	}
-	refField := getter.Call([]reflect.Value{})[0]
-	if !refField.IsValid() {
-		return NewErr("no such field '%s'", field)
-	}
-	return isFieldSet(refField)
+	return False
 }
 
 func (o *protoObj) Get(index ref.Val) ref.Val {
@@ -136,15 +132,11 @@ func (o *protoObj) Get(index ref.Val) ref.Val {
 	if !found {
 		return NewErr("no such field '%s'", index)
 	}
-	getter := o.refValue.MethodByName(fd.GetterName())
-	if !getter.IsValid() {
-		return NewErr("no such field '%s'", index)
+	fv, err := fd.GetFrom(o.refValue)
+	if err != nil {
+		return NewErr(err.Error())
 	}
-	refField := getter.Call(noArgs)[0]
-	if !refField.IsValid() {
-		return NewErr("no such field '%s'", index)
-	}
-	return getOrDefaultInstance(o.TypeAdapter, fd, refField)
+	return o.NativeToValue(fv)
 }
 
 func (o *protoObj) Type() ref.Type {
@@ -153,29 +145,6 @@ func (o *protoObj) Type() ref.Type {
 
 func (o *protoObj) Value() interface{} {
 	return o.value
-}
-
-func isFieldSet(refVal reflect.Value) ref.Val {
-	if refVal.Kind() == reflect.Ptr && refVal.IsNil() {
-		return False
-	}
-	return True
-}
-
-func getOrDefaultInstance(adapter ref.TypeAdapter,
-	fd *pb.FieldDescription,
-	refVal reflect.Value) ref.Val {
-	if isFieldSet(refVal) == True {
-		value := refVal.Interface()
-		return adapter.NativeToValue(value)
-	}
-	if fd.IsWrapper() {
-		return NullValue
-	}
-	if fd.IsMessage() {
-		return adapter.NativeToValue(fd.Type().DefaultValue())
-	}
-	return NewErr("no default value for field: %s", fd.Name())
 }
 
 var (

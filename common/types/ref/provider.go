@@ -43,6 +43,8 @@ type TypeProvider interface {
 	// Used during type-checking only.
 	FindFieldType(messageType string, fieldName string) (*FieldType, bool)
 
+	FindFieldValue(obj interface{}, fieldName string) (interface{}, bool)
+
 	// NewValue creates a new type value from a qualified name and map of field
 	// name to value.
 	//

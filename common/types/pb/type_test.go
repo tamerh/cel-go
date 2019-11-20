@@ -96,9 +96,6 @@ func TestTypeDescription_Field(t *testing.T) {
 	if fd.Name() != "Payload" {
 		t.Error("Unexpected struct name for field 'payload'", fd.Name())
 	}
-	if fd.GetterName() != "GetPayload" {
-		t.Error("Unexpected accessor name for field 'payload'", fd.GetterName())
-	}
 	if fd.IsOneof() {
 		t.Error("Field payload is listed as a oneof and it is not.")
 	}

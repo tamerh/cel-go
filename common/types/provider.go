@@ -102,6 +102,24 @@ func (p *protoTypeRegistry) FindFieldType(messageType string,
 		true
 }
 
+func (p *protoTypeRegistry) FindFieldValue(obj interface{}, fieldName string) (interface{}, bool) {
+	switch o := obj.(type) {
+	case proto.Message:
+		msgName := proto.MessageName(o)
+		msgType, err := p.pbdb.DescribeType(msgName)
+		if err != nil {
+			return nil, false
+		}
+		fieldType, found := msgType.FieldByName(fieldName)
+		if !found {
+			return nil, false
+		}
+		fieldVal, _ := fieldType.GetFrom(reflect.ValueOf(o))
+		return fieldVal, true
+	}
+	return nil, false
+}
+
 func (p *protoTypeRegistry) FindIdent(identName string) (ref.Val, bool) {
 	if t, found := p.revTypeMap[identName]; found {
 		return t.(ref.Val), true
@@ -251,7 +269,11 @@ func (p *protoTypeRegistry) NativeToValue(value interface{}) ref.Val {
 		if err != nil {
 			return NewErr("unknown type: '%s'", typeName)
 		}
-		return NewObject(p, td, v)
+		typeVal, found := p.FindIdent(typeName)
+		if !found {
+			return NewErr("unknown type: '%s'", typeName)
+		}
+		return NewObject(p, td, typeVal.(*TypeValue), v)
 	// Override default handling for list and maps to ensure that blends of Go + proto types
 	// are appropriately adapted on recursive calls or subsequent inspection of the aggregate
 	// value.
