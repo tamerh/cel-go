@@ -715,7 +715,7 @@ type instConst interface {
 	Value() ref.Val
 }
 
-// Make this an Attribute instead.
+// TODO: Make this an Attribute instead.
 type instAttr interface {
 	Interpretable
 	Adapter() ref.TypeAdapter
