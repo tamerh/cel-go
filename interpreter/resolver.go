@@ -23,12 +23,20 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 )
 
+// Resolver provides methods for finding values by name and resolving qualified attributes from
+// them.
 type Resolver interface {
-	ResolveName(name string) (interface{}, bool)
+	// ResolveName returns a value for the given input string if it exists.
+	ResolveName(string) (interface{}, bool)
 
+	// ResolveQualifiers returns the value at the qualified field path or error if the one or more
+	// of the qualifier paths could not be found.
 	ResolveQualifiers(Activation, interface{}, []Qualifier) (interface{}, error)
 }
 
+// NewResolver returns a default Resolver which is cabable of resolving types by simple names, and
+// can resolve qualifiers on CEL values using the supported qualifier types: bool, int, string,
+// and uint.
 func NewResolver(a ref.TypeAdapter, p ref.TypeProvider) Resolver {
 	return &resolver{adapter: a, provider: p}
 }
@@ -38,10 +46,17 @@ type resolver struct {
 	provider ref.TypeProvider
 }
 
+// ResolveName returns a type identifier if one exists.
 func (res *resolver) ResolveName(name string) (interface{}, bool) {
 	return res.provider.FindIdent(name)
 }
 
+// ResolveQualifiers resolves static and dynamic qualifiers on the input object.
+//
+// Resolution of qualifiers on Go simple and aggregate types does not require marshalling of
+// intermediate results to CEL ref.Val instances; however, proto message types and Go structs
+// will be marshalled to CEL ref.Val's which can result in slower resolution time. Custom
+// Resolvers may be used to improve performance.
 func (res *resolver) ResolveQualifiers(vars Activation,
 	obj interface{},
 	quals []Qualifier) (interface{}, error) {

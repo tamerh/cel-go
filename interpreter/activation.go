@@ -161,11 +161,15 @@ var (
 	}
 )
 
+// UnknownActivation returns an Activation that returns a 'types.Unknown' value for all requests
+// to ResolveName.
 func UnknownActivation() Activation {
 	a, _ := PartialActivation(EmptyActivation())
 	return a
 }
 
+// PartialActivation returns an Activation that will resolve identifier names if present, otherwise
+// will return 'types.Unknown'.
 func PartialActivation(bindings interface{}) (Activation, error) {
 	a, err := NewActivation(bindings)
 	if err != nil {
@@ -178,6 +182,7 @@ type partActivation struct {
 	known Activation
 }
 
+// ResolveName implements the Activation interface method.
 func (a *partActivation) ResolveName(name string) (interface{}, bool) {
 	obj, found := a.known.ResolveName(name)
 	if found {
@@ -186,6 +191,7 @@ func (a *partActivation) ResolveName(name string) (interface{}, bool) {
 	return types.Unknown{}, true
 }
 
+// Parent implements the Activation interface method.
 func (a *partActivation) Parent() Activation {
 	return a.known.Parent()
 }

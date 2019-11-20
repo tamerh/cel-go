@@ -106,11 +106,6 @@ func (a *relativeAttribute) Qualify(id int64, v interface{}) (Attribute, error) 
 	return a, nil
 }
 
-func (a *relativeAttribute) QualifyDyn(attr Attribute) (Attribute, error) {
-	a.qualifiers = append(a.qualifiers, attr)
-	return a, nil
-}
-
 func (a *relativeAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	v := a.operand.Eval(vars)
 	if types.IsError(v) {

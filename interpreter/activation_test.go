@@ -20,14 +20,14 @@ import (
 	"github.com/google/cel-go/common/types"
 )
 
-func TestNewActivation(t *testing.T) {
+func TestActivation_Resolve(t *testing.T) {
 	activation, _ := NewActivation(map[string]interface{}{"a": types.True})
 	if val, found := activation.ResolveName("a"); !found || val != types.True {
 		t.Error("Activation failed to resolve 'a'")
 	}
 }
 
-func TestActivation_LazyVariable(t *testing.T) {
+func TestActivation_ResolveLazy(t *testing.T) {
 
 }
 

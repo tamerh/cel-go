@@ -42,8 +42,10 @@ go_test(
     name = "go_default_test",
     srcs = [
         "activation_test.go",
+        "attributes_test.go",
         "interpreter_test.go",
         "prune_test.go",
+        "resolver_test.go",
     ],
     embed = [
         ":go_default_library",

@@ -4,6 +4,22 @@ import (
 	"testing"
 )
 
+func TestAttributes_AbsoluteAttr(t *testing.T) {
+
+}
+
+func TestAttributes_RelativeAttr(t *testing.T) {
+
+}
+
+func TestAttributes_OneofAttr(t *testing.T) {
+
+}
+
+func TestAttributes_ConditionalAttr(t *testing.T) {
+
+}
+
 func BenchmarkAttributes_ResolveAttr(b *testing.B) {
 	tc := map[string]interface{}{
 		"a": map[string]interface{}{

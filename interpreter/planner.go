@@ -623,26 +623,3 @@ func (p *planner) constValue(c *exprpb.Constant) (ref.Val, error) {
 	}
 	return nil, fmt.Errorf("unknown constant type: %v", c)
 }
-
-// getQualifiedId converts a Select expression to a qualified identifier suitable for identifier
-// resolution. If the expression is not an identifier, the second return will be false.
-func (p *planner) getQualifiedID(sel *exprpb.Expr_Select) (string, bool) {
-	validIdent := true
-	resolvedIdent := false
-	ident := sel.Field
-	op := sel.Operand
-	for validIdent && !resolvedIdent {
-		switch op.ExprKind.(type) {
-		case *exprpb.Expr_IdentExpr:
-			ident = op.GetIdentExpr().Name + "." + ident
-			resolvedIdent = true
-		case *exprpb.Expr_SelectExpr:
-			nested := op.GetSelectExpr()
-			ident = nested.GetField() + "." + ident
-			op = nested.Operand
-		default:
-			validIdent = false
-		}
-	}
-	return ident, validIdent
-}
