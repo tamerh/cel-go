@@ -715,9 +715,9 @@ type instConst interface {
 	Value() ref.Val
 }
 
-// TODO: Make this an Attribute instead.
 type instAttr interface {
 	Interpretable
+	Attr() Attribute
 	Adapter() ref.TypeAdapter
 	Resolver() Resolver
 	Qualify(int64, interface{}) (instAttr, error)

@@ -15,7 +15,6 @@
 package interpreter
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/google/cel-go/common/types"
@@ -147,35 +146,20 @@ func (a *conditionalAttribute) Qualify(id int64, v interface{}) (Attribute, erro
 }
 
 func (a *conditionalAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
-	var v interface{}
-	var err error
-	attr, isAttr := a.expr.(instAttr)
-	if isAttr {
-		v, err = attr.Attr().Resolve(vars, res)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		val := a.expr.Eval(vars)
-		if types.IsError(val) {
-			return nil, val.Value().(error)
-		}
-		v = val
+	val := a.expr.Eval(vars)
+	if types.IsError(val) {
+		return nil, val.Value().(error)
 	}
-	if v == types.True || v == true {
+	if val == types.True {
 		return a.truthy.Resolve(vars, res)
 	}
-	if v == types.False || v == false {
+	if val == types.False {
 		return a.falsy.Resolve(vars, res)
 	}
-	rv, isRefVal := v.(ref.Val)
-	if !isRefVal {
-		return nil, errors.New("no such overload")
+	if types.IsUnknown(val) {
+		return val, nil
 	}
-	if types.IsUnknown(rv) {
-		return rv, nil
-	}
-	return nil, types.ValOrErr(rv, "no such overload").Value().(error)
+	return nil, types.ValOrErr(val, "no such overload").Value().(error)
 }
 
 func OneofAttribute(id int64, namespacedNames []string) Attribute {
