@@ -43,8 +43,6 @@ type TypeProvider interface {
 	// Used during type-checking only.
 	FindFieldType(messageType string, fieldName string) (*FieldType, bool)
 
-	FindFieldValue(obj interface{}, fieldName string) (interface{}, bool)
-
 	// NewValue creates a new type value from a qualified name and map of field
 	// name to value.
 	//
@@ -90,4 +88,12 @@ type FieldType struct {
 
 	// Type of the field.
 	Type *exprpb.Type
+
+	IsSet FieldTester
+
+	GetFrom FieldGetter
 }
+
+type FieldTester func(target interface{}) bool
+
+type FieldGetter func(target interface{}) (interface{}, error)

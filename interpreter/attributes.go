@@ -235,6 +235,8 @@ func newQualifier(id int64, v interface{}) (Qualifier, error) {
 	switch val := v.(type) {
 	case Attribute:
 		return val, nil
+	case Qualifier:
+		return val, nil
 	case string:
 		qual = &stringQualifier{id: id, Value: val, CelValue: types.String(val)}
 	case int64:
@@ -301,7 +303,20 @@ func (q *boolQualifier) ID() int64 {
 	return q.id
 }
 
-type attributePattern struct {
-	variable   types.String
-	qualifiers []ref.Val
+func FieldQualifier(id int64, name string, fieldType *ref.FieldType) Qualifier {
+	return &fieldQualifier{
+		id:        id,
+		Name:      name,
+		FieldType: fieldType,
+	}
+}
+
+type fieldQualifier struct {
+	id        int64
+	Name      string
+	FieldType *ref.FieldType
+}
+
+func (q *fieldQualifier) ID() int64 {
+	return q.id
 }

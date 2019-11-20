@@ -153,7 +153,22 @@ func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interp
 				ConstExpr: identRef.Value,
 			}})
 	}
-	// Return the attribute for the resolved identifier name.
+
+	// Check to see whether the type map indicates this is a type name. All types should be
+	// registered with the provider.
+	cType := p.typeMap[id]
+	if cType.GetType() != nil {
+		cVal, found := p.provider.FindIdent(identRef.Name)
+		if !found {
+			return nil, fmt.Errorf("reference to undefined type: %s", identRef.Name)
+		}
+		return &evalConst{
+			id:  id,
+			val: cVal,
+		}, nil
+	}
+
+	// Otherwise, return the attribute for the resolved identifier name.
 	return &evalAttr{
 		adapter:  p.adapter,
 		resolver: p.resolver,
@@ -166,7 +181,29 @@ func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interp
 //  b) creates a field presence test for a select within a has() macro.
 //  c) resolves the select expression to a namespaced identifier.
 func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
+	// If the Select id appears in the reference map from the CheckedExpr proto then it is either
+	// a namespaced identifier or enum value.
+	if identRef, found := p.refMap[expr.Id]; found {
+		return p.planCheckedIdent(expr.Id, identRef)
+	}
+
 	sel := expr.GetSelectExpr()
+	// Plan the operand evaluation.
+	op, err := p.Plan(sel.GetOperand())
+	if err != nil {
+		return nil, err
+	}
+
+	// Determine the field type if this is a proto message type.
+	var fieldType *ref.FieldType
+	opType := p.typeMap[op.ID()]
+	if opType.GetMessageType() != "" {
+		ft, found := p.provider.FindFieldType(opType.GetMessageType(), sel.Field)
+		if found && ft.IsSet != nil && ft.GetFrom != nil {
+			fieldType = ft
+		}
+	}
+
 	// If the Select was marked TestOnly, this is a presence test.
 	//
 	// Note: presence tests are defined for structured (e.g. proto) and dynamic values (map, json)
@@ -179,34 +216,27 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 	// it is not clear whether has should error or follow the convention defined for structured
 	// values.
 	if sel.TestOnly {
-		op, err := p.Plan(sel.GetOperand())
-		if err != nil {
-			return nil, err
-		}
+		// Return the test only eval expression.
 		return &evalTestOnly{
-			id:    expr.Id,
-			field: types.String(sel.Field),
-			op:    op,
+			id:        expr.Id,
+			field:     types.String(sel.Field),
+			fieldType: fieldType,
+			op:        op,
 		}, nil
 	}
 
-	// If the Select id appears in the reference map from the CheckedExpr proto then it is either
-	// a namespaced identifier or enum value.
-	if identRef, found := p.refMap[expr.Id]; found {
-		return p.planCheckedIdent(expr.Id, identRef)
+	var qual interface{} = sel.Field
+	if fieldType != nil {
+		qual = FieldQualifier(expr.Id, sel.Field, fieldType)
 	}
 
 	// Lastly, create a field selection Interpretable.
-	op, err := p.Plan(sel.GetOperand())
-	if err != nil {
-		return nil, err
-	}
 	attr, isAttr := op.(instAttr)
 	if isAttr {
-		return attr.Qualify(expr.Id, sel.Field)
+		return attr.Qualify(expr.Id, qual)
 	}
 	relAttr := RelativeAttribute(op.ID(), op)
-	_, err = relAttr.Qualify(expr.Id, sel.Field)
+	_, err = relAttr.Qualify(expr.Id, qual)
 	if err != nil {
 		return nil, err
 	}

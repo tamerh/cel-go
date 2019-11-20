@@ -35,9 +35,10 @@ type Interpretable interface {
 // Core Interpretable implementations used during the program planning phase.
 
 type evalTestOnly struct {
-	id    int64
-	op    Interpretable
-	field types.String
+	id        int64
+	op        Interpretable
+	field     types.String
+	fieldType *ref.FieldType
 }
 
 // ID implements the Interpretable interface method.
@@ -47,6 +48,26 @@ func (test *evalTestOnly) ID() int64 {
 
 // Eval implements the Interpretable interface method.
 func (test *evalTestOnly) Eval(ctx Activation) ref.Val {
+	// Handle field selection on a proto in the most efficient way possible.
+	if test.fieldType != nil {
+		opAttr, ok := test.op.(instAttr)
+		if ok {
+			opVal, err := opAttr.Attr().Resolve(ctx, opAttr.Resolver())
+			if err != nil {
+				return types.NewErr(err.Error())
+			}
+			refVal, ok := opVal.(ref.Val)
+			if ok {
+				opVal = refVal.Value()
+			}
+			isSet := test.fieldType.IsSet(opVal)
+			if isSet {
+				return types.True
+			}
+			return types.False
+		}
+	}
+
 	obj := test.op.Eval(ctx)
 	tester, ok := obj.(traits.FieldTester)
 	if ok {

@@ -263,30 +263,38 @@ func (fd *FieldDescription) CheckedType() *exprpb.Type {
 	return fd.typeDefToType()
 }
 
-func (fd *FieldDescription) IsSetOn(target reflect.Value) bool {
+func (fd *FieldDescription) IsSet(target interface{}) bool {
+	t, ok := target.(reflect.Value)
+	if !ok {
+		t = reflect.ValueOf(target)
+	}
 	var fieldVal reflect.Value
 	if fd.field != nil && !fd.IsOneof() {
-		target = reflect.Indirect(target)
-		if target.Kind() == reflect.Struct {
-			fieldVal = target.FieldByIndex(fd.field.Index)
+		t = reflect.Indirect(t)
+		if t.Kind() == reflect.Struct {
+			fieldVal = t.FieldByIndex(fd.field.Index)
 		}
 	} else {
-		fieldVal = fd.getter.Call([]reflect.Value{target})[0]
+		fieldVal = fd.getter.Call([]reflect.Value{t})[0]
 	}
 	return isFieldSet(fieldVal)
 }
 
 // GetFrom returns the accessor method associated with the field
 // on the proto generated struct.
-func (fd *FieldDescription) GetFrom(target reflect.Value) (interface{}, error) {
+func (fd *FieldDescription) GetFrom(target interface{}) (interface{}, error) {
+	t, ok := target.(reflect.Value)
+	if !ok {
+		t = reflect.ValueOf(target)
+	}
 	var fieldVal reflect.Value
 	if fd.field != nil && !fd.IsOneof() {
-		target = reflect.Indirect(target)
-		if target.Kind() == reflect.Struct {
-			fieldVal = target.FieldByIndex(fd.field.Index)
+		t = reflect.Indirect(t)
+		if t.Kind() == reflect.Struct {
+			fieldVal = t.FieldByIndex(fd.field.Index)
 		}
 	} else {
-		fieldVal = fd.getter.Call([]reflect.Value{target})[0]
+		fieldVal = fd.getter.Call([]reflect.Value{t})[0]
 	}
 	if isFieldSet(fieldVal) {
 		return fieldVal.Interface(), nil

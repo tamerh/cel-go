@@ -21,8 +21,6 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-
-	"github.com/golang/protobuf/proto"
 )
 
 // Resolver provides methods for finding values by name and resolving qualified attributes from
@@ -72,6 +70,16 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		isKey := false
 		isIndex := false
 		switch qual := quals[idx].(type) {
+		case *fieldQualifier:
+			if rv, ok := obj.(ref.Val); ok {
+				obj = rv.Value()
+			}
+			v, err := qual.FieldType.GetFrom(obj)
+			if err != nil {
+				return nil, err
+			}
+			obj = v
+			continue
 		case *stringQualifier:
 			s = qual.Value
 			cVal = qual.CelValue
@@ -135,20 +143,6 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 
 	QualString:
 		switch o := obj.(type) {
-		case proto.Message:
-			fVal, found := res.provider.FindFieldValue(o, s)
-			if found {
-				obj = fVal
-				continue
-			}
-			elem, err := res.refResolve(cVal, obj)
-			if err != nil {
-				return nil, err
-			}
-			if types.IsUnknown(elem) {
-				return res.fmtUnknown(elem, quals[idx]), nil
-			}
-			obj = elem
 		case map[string]interface{}:
 			isMap = true
 			obj, isKey = o[s]

@@ -98,26 +98,10 @@ func (p *protoTypeRegistry) FindFieldType(messageType string,
 	}
 	return &ref.FieldType{
 			Type:             field.CheckedType(),
-			SupportsPresence: field.SupportsPresence()},
+			SupportsPresence: field.SupportsPresence(),
+			IsSet:            field.IsSet,
+			GetFrom:          field.GetFrom},
 		true
-}
-
-func (p *protoTypeRegistry) FindFieldValue(obj interface{}, fieldName string) (interface{}, bool) {
-	switch o := obj.(type) {
-	case proto.Message:
-		msgName := proto.MessageName(o)
-		msgType, err := p.pbdb.DescribeType(msgName)
-		if err != nil {
-			return nil, false
-		}
-		fieldType, found := msgType.FieldByName(fieldName)
-		if !found {
-			return nil, false
-		}
-		fieldVal, _ := fieldType.GetFrom(reflect.ValueOf(o))
-		return fieldVal, true
-	}
-	return nil, false
 }
 
 func (p *protoTypeRegistry) FindIdent(identName string) (ref.Val, bool) {
