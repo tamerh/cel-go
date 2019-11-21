@@ -69,8 +69,13 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		isMap := false
 		isKey := false
 		isIndex := false
+		// First, determine the value and type of the qualifier. Most qualifiers have both a
+		// simple Go value and a CEL value in order to reduce allocations required for conversion
+		// between the two.
 		switch qual := quals[idx].(type) {
 		case *fieldQualifier:
+			// A field qualifier is capable of obtaining the value of the field from the object
+			// where it is defined.
 			if rv, ok := obj.(ref.Val); ok {
 				obj = rv.Value()
 			}
@@ -124,10 +129,26 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 				s = q
 				cVal = types.String(s)
 				goto QualString
+			case int:
+				i = int64(q)
+				cVal = types.Int(i)
+				goto QualInt
+			case int32:
+				i = int64(q)
+				cVal = types.Int(i)
+				goto QualInt
 			case int64:
 				i = q
 				cVal = types.Int(i)
 				goto QualInt
+			case uint:
+				u = uint64(q)
+				cVal = types.Uint(u)
+				goto QualUint
+			case uint32:
+				u = uint64(q)
+				cVal = types.Uint(u)
+				goto QualUint
 			case uint64:
 				u = q
 				cVal = types.Uint(u)
@@ -294,61 +315,6 @@ func (res *resolver) ResolveQualifiers(vars Activation,
 		case map[uint64]interface{}:
 			isMap = true
 			obj, isKey = o[u]
-		case []interface{}:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []string:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []int:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []int32:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []int64:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []uint:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []uint32:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []uint64:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []float32:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []float64:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
-		case []bool:
-			isIndex = u >= 0 && u < uint64(len(o))
-			if isIndex {
-				obj = o[u]
-			}
 		case types.Unknown:
 			return o, nil
 		default:

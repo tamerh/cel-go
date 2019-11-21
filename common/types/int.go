@@ -84,14 +84,12 @@ func (i Int) Compare(other ref.Val) ref.Val {
 // ConvertToNative implements ref.Val.ConvertToNative.
 func (i Int) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
-	case reflect.Int32:
+	case reflect.Int, reflect.Int32, reflect.Int64:
 		// Enums are also mapped as int32 derivations.
 		// Note, the code doesn't convert to the enum value directly since this is not known, but
 		// the net effect with respect to proto-assignment is handled correctly by the reflection
 		// Convert method.
 		return reflect.ValueOf(i).Convert(typeDesc).Interface(), nil
-	case reflect.Int64:
-		return int64(i), nil
 	case reflect.Ptr:
 		switch typeDesc {
 		case anyValueType:

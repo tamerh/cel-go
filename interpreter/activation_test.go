@@ -16,9 +16,26 @@ package interpreter
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
 )
+
+func TestActivation(t *testing.T) {
+	act, err := NewActivation(map[string]interface{}{"a": types.True})
+	if err != nil {
+		t.Fatalf("Got err: %v, wanted activation", err)
+	}
+	_, err = NewActivation(act)
+	if err != nil {
+		t.Fatalf("Got err: %v, wanted activation", err)
+	}
+	act3, err := NewActivation("")
+	if err == nil {
+		t.Fatalf("Got %v, wanted err", act3)
+	}
+}
 
 func TestActivation_Resolve(t *testing.T) {
 	activation, _ := NewActivation(map[string]interface{}{"a": types.True})
@@ -28,7 +45,22 @@ func TestActivation_Resolve(t *testing.T) {
 }
 
 func TestActivation_ResolveLazy(t *testing.T) {
-
+	var v ref.Val
+	now := func() ref.Val {
+		if v == nil {
+			v = types.DefaultTypeAdapter.NativeToValue(time.Now().Unix())
+		}
+		return v
+	}
+	a, _ := NewActivation(map[string]interface{}{
+		"now": now,
+	})
+	first, _ := a.ResolveName("now")
+	second, _ := a.ResolveName("now")
+	if first != second {
+		t.Errorf("Got different second, "+
+			"expected same as first: 1:%v 2:%v", first, second)
+	}
 }
 
 func TestHierarchicalActivation(t *testing.T) {

@@ -21,12 +21,25 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 )
 
+// Attribute values are a variable or value with an optional set of qualifiers, such as field, key,
+// or index accesses.
 type Attribute interface {
+	// ID is the expression identifier where the attribute first appears.
 	ID() int64
+
+	// Qualify adds an additional qualifier on the Attribute or error if the qualification is not
+	// a supported proto map key type.
 	Qualify(id int64, v interface{}) (Attribute, error)
+
+	// Resolve returns the qualified Attribute value from the current Activation and Resolver, or
+	// error if the qualification is not defined.
 	Resolve(Activation, Resolver) (interface{}, error)
 }
 
+// AbsoluteAttribute refers to a variable value and an optional qualifier path.
+//
+// The namespaceNames represent the names the variable could have based on namespace
+// resolution rules.
 func AbsoluteAttribute(id int64, namespacedNames []string) Attribute {
 	return &absoluteAttribute{
 		id:             id,
@@ -41,10 +54,12 @@ type absoluteAttribute struct {
 	qualifiers     []Qualifier
 }
 
+// ID implements the Attribute interface method.
 func (a *absoluteAttribute) ID() int64 {
 	return a.id
 }
 
+// Qualify implements the Attribute interface method.
 func (a *absoluteAttribute) Qualify(id int64, v interface{}) (Attribute, error) {
 	qual, err := newQualifier(id, v)
 	if err != nil {
@@ -54,6 +69,10 @@ func (a *absoluteAttribute) Qualify(id int64, v interface{}) (Attribute, error) 
 	return a, nil
 }
 
+// Resolve iterates through the namespaced variable names until one is found in the Activation,
+// and the the standard qualifier resolution logic is applied.
+//
+// If the variable name is not found an error is returned.
 func (a *absoluteAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	for _, nm := range a.namespaceNames {
 		op, found := vars.ResolveName(nm)
@@ -64,6 +83,7 @@ func (a *absoluteAttribute) Resolve(vars Activation, res Resolver) (interface{},
 			}
 			return res.ResolveQualifiers(vars, op, a.qualifiers)
 		}
+		// Attempt to resolve the qualified type name if the name is not a variable identifier.
 		typ, found := res.ResolveName(nm)
 		if found {
 			if len(a.qualifiers) == 0 {
@@ -78,6 +98,7 @@ func (a *absoluteAttribute) Resolve(vars Activation, res Resolver) (interface{},
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
+// RelativeAttribute refers to an expression and an optional qualifier path.
 func RelativeAttribute(id int64, operand Interpretable) Attribute {
 	return &relativeAttribute{
 		id:         id,
@@ -92,10 +113,12 @@ type relativeAttribute struct {
 	qualifiers []Qualifier
 }
 
+// ID is an implementation of the Attribute interface method.
 func (a *relativeAttribute) ID() int64 {
 	return a.id
 }
 
+// Qualify implements the Attribute interface method.
 func (a *relativeAttribute) Qualify(id int64, v interface{}) (Attribute, error) {
 	qual, err := newQualifier(id, v)
 	if err != nil {
@@ -105,6 +128,7 @@ func (a *relativeAttribute) Qualify(id int64, v interface{}) (Attribute, error) 
 	return a, nil
 }
 
+// Resolve expression value and qualifier relative to the expression result.
 func (a *relativeAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	v := a.operand.Eval(vars)
 	if types.IsError(v) {
@@ -113,6 +137,8 @@ func (a *relativeAttribute) Resolve(vars Activation, res Resolver) (interface{},
 	return res.ResolveQualifiers(vars, v, a.qualifiers)
 }
 
+// ConditionalAttribute supports the case where an attribute selection may occur on a conditional
+// expression, e.g. (cond ? a : b).c
 func ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute {
 	return &conditionalAttribute{
 		id:     id,
@@ -129,10 +155,13 @@ type conditionalAttribute struct {
 	falsy  Attribute
 }
 
+// ID is an implementation of the Attribute interface method.
 func (a *conditionalAttribute) ID() int64 {
 	return a.id
 }
 
+// Qualify appends the same qualifier to both sides of the conditional, in effect managing the
+// qualification of alternate attributes.
 func (a *conditionalAttribute) Qualify(id int64, v interface{}) (Attribute, error) {
 	_, err := a.truthy.Qualify(id, v)
 	if err != nil {
@@ -145,6 +174,7 @@ func (a *conditionalAttribute) Qualify(id int64, v interface{}) (Attribute, erro
 	return a, nil
 }
 
+// Resolve evaluates the condition, and then resolves the truthy or falsy branch accordingly.
 func (a *conditionalAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	val := a.expr.Eval(vars)
 	if types.IsError(val) {
@@ -162,6 +192,8 @@ func (a *conditionalAttribute) Resolve(vars Activation, res Resolver) (interface
 	return nil, types.ValOrErr(val, "no such overload").Value().(error)
 }
 
+// OneofAttribute collects variants of unchecked AbsoluteAttribute values which could either be
+// direct variable accesses or some combination of variable access with qualification.
 func OneofAttribute(id int64, namespacedNames []string) Attribute {
 	return &oneofAttribute{
 		id: id,
@@ -179,10 +211,13 @@ type oneofAttribute struct {
 	attrs []*absoluteAttribute
 }
 
+// ID is an implementation of the Attribute interface method.
 func (a *oneofAttribute) ID() int64 {
 	return a.id
 }
 
+// Qualify adds a qualifier to each possible attribute variant in the oneof, and also creates a new
+// namespaced variable from the qualified value.
 func (a *oneofAttribute) Qualify(id int64, v interface{}) (Attribute, error) {
 	str, isStr := v.(string)
 	var augmentedNames []string
@@ -207,6 +242,7 @@ func (a *oneofAttribute) Qualify(id int64, v interface{}) (Attribute, error) {
 	return a, nil
 }
 
+// Resolve follows the variable resolution
 func (a *oneofAttribute) Resolve(vars Activation, res Resolver) (interface{}, error) {
 	for _, attr := range a.attrs {
 		for _, nm := range attr.namespaceNames {
@@ -259,7 +295,10 @@ func newQualifier(id int64, v interface{}) (Qualifier, error) {
 	return qual, nil
 }
 
+// Qualifier marker interface for designating different qualifier values and where they appear
+// within expressions.
 type Qualifier interface {
+	// ID where the qualifier appears within an expression.
 	ID() int64
 }
 
@@ -269,6 +308,7 @@ type stringQualifier struct {
 	CelValue ref.Val
 }
 
+// ID is an implementation of the Qualifier interface method.
 func (q *stringQualifier) ID() int64 {
 	return q.id
 }
@@ -279,6 +319,7 @@ type intQualifier struct {
 	CelValue ref.Val
 }
 
+// ID is an implementation of the Qualifier interface method.
 func (q *intQualifier) ID() int64 {
 	return q.id
 }
@@ -289,6 +330,7 @@ type uintQualifier struct {
 	CelValue ref.Val
 }
 
+// ID is an implementation of the Qualifier interface method.
 func (q *uintQualifier) ID() int64 {
 	return q.id
 }
@@ -299,10 +341,14 @@ type boolQualifier struct {
 	CelValue ref.Val
 }
 
+// ID is an implementation of the Qualifier interface method.
 func (q *boolQualifier) ID() int64 {
 	return q.id
 }
 
+// FieldQualifier indicates that the qualification is a well-defined field with a known
+// field type. When the field type is known this can be used to improve the speed and
+// efficiency of field resolution.
 func FieldQualifier(id int64, name string, fieldType *ref.FieldType) Qualifier {
 	return &fieldQualifier{
 		id:        id,
@@ -317,6 +363,7 @@ type fieldQualifier struct {
 	FieldType *ref.FieldType
 }
 
+// ID is an implementation of the Qualifier interface method.
 func (q *fieldQualifier) ID() int64 {
 	return q.id
 }

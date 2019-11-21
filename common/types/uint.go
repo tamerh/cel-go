@@ -78,10 +78,8 @@ func (i Uint) Compare(other ref.Val) ref.Val {
 // ConvertToNative implements ref.Val.ConvertToNative.
 func (i Uint) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
-	case reflect.Uint32:
-		return uint32(i), nil
-	case reflect.Uint64:
-		return uint64(i), nil
+	case reflect.Uint, reflect.Uint32, reflect.Uint64:
+		return reflect.ValueOf(i).Convert(typeDesc).Interface(), nil
 	case reflect.Ptr:
 		switch typeDesc {
 		case anyValueType:

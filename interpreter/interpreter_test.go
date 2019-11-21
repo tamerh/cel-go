@@ -680,6 +680,24 @@ func BenchmarkInterpreter(b *testing.B) {
 	}
 }
 
+func BenchmarkInterpreter_Parallel(b *testing.B) {
+	for _, tst := range testData {
+		prg, vars, err := program(&tst, Optimize())
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.ResetTimer()
+		b.Run(tst.name,
+			func(bb *testing.B) {
+				bb.RunParallel(func(pb *testing.PB) {
+					for pb.Next() {
+						prg.Eval(vars)
+					}
+				})
+			})
+	}
+}
+
 func TestInterpreter(t *testing.T) {
 	for _, tst := range testData {
 		tc := tst
