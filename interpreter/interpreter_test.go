@@ -156,11 +156,11 @@ var (
 		{
 			name: "complex",
 			expr: `
-				!(headers.ip in ["10.0.1.4", "10.0.1.5"]) &&
-				  ((headers.path.startsWith("v1") && headers.token in ["v1", "v2", "admin"]) ||
-				   (headers.path.startsWith("v2") && headers.token in ["v2", "admin"]) ||
-				   (headers.path.startsWith("/admin") && headers.token == "admin" && headers.ip in ["10.0.1.2", "10.0.1.2", "10.0.1.2"]))
-				`,
+			!(headers.ip in ["10.0.1.4", "10.0.1.5"]) &&
+				((headers.path.startsWith("v1") && headers.token in ["v1", "v2", "admin"]) ||
+				(headers.path.startsWith("v2") && headers.token in ["v2", "admin"]) ||
+				(headers.path.startsWith("/admin") && headers.token == "admin" && headers.ip in ["10.0.1.2", "10.0.1.2", "10.0.1.2"]))
+			`,
 			env: []*exprpb.Decl{
 				decls.NewIdent("headers", decls.NewMapType(decls.String, decls.String), nil),
 			},
@@ -175,11 +175,11 @@ var (
 		{
 			name: "complex_qual_vars",
 			expr: `
-				!(headers.ip in ["10.0.1.4", "10.0.1.5"]) &&
-				  ((headers.path.startsWith("v1") && headers.token in ["v1", "v2", "admin"]) ||
-				   (headers.path.startsWith("v2") && headers.token in ["v2", "admin"]) ||
-				   (headers.path.startsWith("/admin") && headers.token == "admin" && headers.ip in ["10.0.1.2", "10.0.1.2", "10.0.1.2"]))
-				`,
+			!(headers.ip in ["10.0.1.4", "10.0.1.5"]) &&
+				((headers.path.startsWith("v1") && headers.token in ["v1", "v2", "admin"]) ||
+				(headers.path.startsWith("v2") && headers.token in ["v2", "admin"]) ||
+				(headers.path.startsWith("/admin") && headers.token == "admin" && headers.ip in ["10.0.1.2", "10.0.1.2", "10.0.1.2"]))
+			`,
 			env: []*exprpb.Decl{
 				decls.NewIdent("headers.ip", decls.String, nil),
 				decls.NewIdent("headers.path", decls.String, nil),
@@ -263,11 +263,11 @@ var (
 			pkg:   "google.api.expr",
 			types: []proto.Message{&exprpb.Expr{}},
 			expr: `v1alpha1.Expr{
-					id: 1,
-					const_expr: v1alpha1.Constant{
-						string_value: "oneof_test"
-					}
-				}`,
+				id: 1,
+				const_expr: v1alpha1.Constant{
+					string_value: "oneof_test"
+				}
+			}`,
 			out: &exprpb.Expr{Id: 1,
 				ExprKind: &exprpb.Expr_ConstExpr{
 					ConstExpr: &exprpb.Constant{
@@ -279,13 +279,13 @@ var (
 			pkg:   "google.expr.proto3.test",
 			types: []proto.Message{&proto3pb.TestAllTypes{}},
 			expr: `TestAllTypes{
-					repeated_nested_enum: [
-						0,
-						TestAllTypes.NestedEnum.BAZ,
-						TestAllTypes.NestedEnum.BAR],
-					repeated_int32: [
-						TestAllTypes.NestedEnum.FOO,
-						TestAllTypes.NestedEnum.BAZ]}`,
+				repeated_nested_enum: [
+					0,
+					TestAllTypes.NestedEnum.BAZ,
+					TestAllTypes.NestedEnum.BAR],
+				repeated_int32: [
+					TestAllTypes.NestedEnum.FOO,
+					TestAllTypes.NestedEnum.BAZ]}`,
 			out: &proto3pb.TestAllTypes{
 				RepeatedNestedEnum: []proto3pb.TestAllTypes_NestedEnum{
 					proto3pb.TestAllTypes_FOO,
@@ -307,7 +307,7 @@ var (
 		{
 			name: "macro_all_non_strict_var",
 			expr: `code == "111" && ["a", "b"].all(x, x in tags)
-					|| code == "222" && ["a", "b"].all(x, x in tags)`,
+				|| code == "222" && ["a", "b"].all(x, x in tags)`,
 			env: []*exprpb.Decl{
 				decls.NewIdent("code", decls.String, nil),
 				decls.NewIdent("tags", decls.NewListType(decls.String), nil),
@@ -352,7 +352,7 @@ var (
 			types: []proto.Message{&exprpb.ParsedExpr{}},
 			pkg:   "google.api.expr.v1alpha1",
 			expr: `has(v1alpha1.ParsedExpr{expr:Expr{id: 1}}.expr)
-					&& !has(expr.v1alpha1.ParsedExpr{expr:Expr{id: 1}}.source_info)`,
+				&& !has(expr.v1alpha1.ParsedExpr{expr:Expr{id: 1}}.source_info)`,
 		},
 		{
 			name: "macro_map",
@@ -361,9 +361,9 @@ var (
 		{
 			name: "matches",
 			expr: `input.matches('k.*')
-					&& !'foo'.matches('k.*')
-					&& !'bar'.matches('k.*')
-					&& 'kilimanjaro'.matches('.*ro')`,
+				&& !'foo'.matches('k.*')
+				&& !'bar'.matches('k.*')
+				&& 'kilimanjaro'.matches('.*ro')`,
 			env: []*exprpb.Decl{
 				decls.NewIdent("input", decls.String, nil),
 			},

@@ -89,11 +89,15 @@ type FieldType struct {
 	// Type of the field.
 	Type *exprpb.Type
 
+	// IsSet indicates whether the field is set on an input object.
 	IsSet FieldTester
 
+	// GetFrom retrieves the field value on the input object, if set.
 	GetFrom FieldGetter
 }
 
+// FieldTester is used to test field presence on an input object.
 type FieldTester func(target interface{}) bool
 
+// FieldGetter is used to get the field value from an input object, if set.
 type FieldGetter func(target interface{}) (interface{}, error)

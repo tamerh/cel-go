@@ -263,6 +263,8 @@ func (fd *FieldDescription) CheckedType() *exprpb.Type {
 	return fd.typeDefToType()
 }
 
+// IsSet returns whether the field is set on the target value, per the proto presence conventions
+// of proto2 or proto3 accordingly.
 func (fd *FieldDescription) IsSet(target interface{}) bool {
 	t, ok := target.(reflect.Value)
 	if !ok {
