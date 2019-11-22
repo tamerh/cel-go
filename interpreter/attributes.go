@@ -18,10 +18,39 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/cel-go/common/packages"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
+
+// Resolver provides methods for finding values by name and resolving qualified attributes from
+// them.
+type Resolver interface {
+	AbsoluteAttribute(id int64, name string) Attribute
+
+	ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute
+
+	OneofAttribute(id int64, name string) Attribute
+
+	RelativeAttribute(id int64, operand Interpretable) Attribute
+
+	// NewQualifier creates a qualifier on the target object with a given value.
+	//
+	// The 'val' may be an Attribute or any proto-supported map key type: bool, int, string, uint.
+	NewQualifier(objType *exprpb.Type, qualID int64, val interface{}) (Qualifier, error)
+}
+
+// Qualifier marker interface for designating different qualifier values and where they appear
+// within expressions.
+type Qualifier interface {
+	// ID where the qualifier appears within an expression.
+	ID() int64
+
+	Qualify(vars Activation, obj interface{}) (interface{}, error)
+}
 
 // Attribute values are a variable or value with an optional set of qualifiers, such as field, key,
 // or index accesses.
@@ -30,24 +59,96 @@ type Attribute interface {
 
 	// Qualify adds an additional qualifier on the Attribute or error if the qualification is not
 	// a supported proto map key type.
-	AddQualifier(id int64, v interface{}) (Attribute, error)
+	AddQualifier(Qualifier) (Attribute, error)
+
+	Resolve(Activation) (interface{}, error)
+}
+
+// NewResolver returns a default Resolver which is cabable of resolving types by simple names, and
+// can resolve qualifiers on CEL values using the supported qualifier types: bool, int, string,
+// and uint.
+func NewResolver(pkg packages.Packager,
+	a ref.TypeAdapter,
+	p ref.TypeProvider) Resolver {
+	return &resolver{
+		pkg:      pkg,
+		adapter:  a,
+		provider: p,
+	}
+}
+
+type resolver struct {
+	pkg      packages.Packager
+	adapter  ref.TypeAdapter
+	provider ref.TypeProvider
 }
 
 // AbsoluteAttribute refers to a variable value and an optional qualifier path.
 //
 // The namespaceNames represent the names the variable could have based on namespace
 // resolution rules.
-func AbsoluteAttribute(adapter ref.TypeAdapter,
-	provider ref.TypeProvider,
-	id int64,
-	namespacedNames []string) Attribute {
+func (r *resolver) AbsoluteAttribute(id int64, name string) Attribute {
 	return &absoluteAttribute{
 		id:             id,
-		namespaceNames: namespacedNames,
+		namespaceNames: []string{name},
 		qualifiers:     []Qualifier{},
-		adapter:        adapter,
-		provider:       provider,
+		adapter:        r.adapter,
+		provider:       r.provider,
 	}
+}
+
+// ConditionalAttribute supports the case where an attribute selection may occur on a conditional
+// expression, e.g. (cond ? a : b).c
+func (r *resolver) ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute {
+	return &conditionalAttribute{
+		id:      id,
+		expr:    expr,
+		truthy:  t,
+		falsy:   f,
+		adapter: r.adapter,
+	}
+}
+
+// OneofAttribute collects variants of unchecked AbsoluteAttribute values which could either be
+// direct variable accesses or some combination of variable access with qualification.
+func (r *resolver) OneofAttribute(id int64, name string) Attribute {
+	return &oneofAttribute{
+		id: id,
+		attrs: []*absoluteAttribute{
+			&absoluteAttribute{
+				id:             id,
+				namespaceNames: r.pkg.ResolveCandidateNames(name),
+				qualifiers:     []Qualifier{},
+				provider:       r.provider,
+				adapter:        r.adapter,
+			},
+		},
+		adapter:  r.adapter,
+		provider: r.provider,
+	}
+}
+
+// RelativeAttribute refers to an expression and an optional qualifier path.
+func (r *resolver) RelativeAttribute(id int64, operand Interpretable) Attribute {
+	return &relativeAttribute{
+		id:         id,
+		operand:    operand,
+		qualifiers: []Qualifier{},
+		adapter:    r.adapter,
+	}
+}
+
+func (r *resolver) NewQualifier(objType *exprpb.Type,
+	qualID int64,
+	val interface{}) (Qualifier, error) {
+	str, isStr := val.(string)
+	if isStr && objType != nil && objType.GetMessageType() != "" {
+		ft, found := r.provider.FindFieldType(objType.GetMessageType(), str)
+		if found && ft.IsSet != nil && ft.GetFrom != nil {
+			return FieldQualifier(r.adapter, qualID, str, ft), nil
+		}
+	}
+	return newQualifier(r.adapter, qualID, val)
 }
 
 type absoluteAttribute struct {
@@ -64,11 +165,7 @@ func (a *absoluteAttribute) ID() int64 {
 }
 
 // Qualify implements the Attribute interface method.
-func (a *absoluteAttribute) AddQualifier(id int64, v interface{}) (Attribute, error) {
-	qual, err := newQualifier(a.adapter, id, v)
-	if err != nil {
-		return nil, err
-	}
+func (a *absoluteAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 	a.qualifiers = append(a.qualifiers, qual)
 	return a, nil
 }
@@ -77,7 +174,7 @@ func (a *absoluteAttribute) AddQualifier(id int64, v interface{}) (Attribute, er
 // and the the standard qualifier resolution logic is applied.
 //
 // If the variable name is not found an error is returned.
-func (a *absoluteAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+func (a *absoluteAttribute) Resolve(vars Activation) (interface{}, error) {
 	for _, nm := range a.namespaceNames {
 		op, found := vars.ResolveName(nm)
 		_, isUnk := op.(types.Unknown)
@@ -106,75 +203,24 @@ func (a *absoluteAttribute) Qualify(vars Activation, obj interface{}) (interface
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
-// RelativeAttribute refers to an expression and an optional qualifier path.
-func RelativeAttribute(adapter ref.TypeAdapter,
-	id int64, operand Interpretable) Attribute {
-	return &relativeAttribute{
-		id:         id,
-		operand:    operand,
-		qualifiers: []Qualifier{},
-		adapter:    adapter,
-	}
-}
-
-type relativeAttribute struct {
-	id         int64
-	operand    Interpretable
-	qualifiers []Qualifier
-	adapter    ref.TypeAdapter
-}
-
-// ID is an implementation of the Attribute interface method.
-func (a *relativeAttribute) ID() int64 {
-	return a.id
-}
-
-// Qualify implements the Attribute interface method.
-func (a *relativeAttribute) AddQualifier(id int64, v interface{}) (Attribute, error) {
-	qual, err := newQualifier(a.adapter, id, v)
+func (a *absoluteAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
 	}
-	a.qualifiers = append(a.qualifiers, qual)
-	return a, nil
-}
-
-// Resolve expression value and qualifier relative to the expression result.
-func (a *relativeAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
-	v := a.operand.Eval(vars)
-	if types.IsError(v) {
-		return nil, v.Value().(error)
+	qual, err := newQualifier(a.adapter, a.id, val)
+	if err != nil {
+		return nil, err
 	}
-	if types.IsUnknown(v) {
-		return v, nil
-	}
-	var err error
-	obj = v
-	for _, qual := range a.qualifiers {
-		obj, err = qual.Qualify(vars, obj)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return obj, nil
-}
-
-// ConditionalAttribute supports the case where an attribute selection may occur on a conditional
-// expression, e.g. (cond ? a : b).c
-func ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute {
-	return &conditionalAttribute{
-		id:     id,
-		expr:   expr,
-		truthy: t,
-		falsy:  f,
-	}
+	return qual.Qualify(vars, obj)
 }
 
 type conditionalAttribute struct {
-	id     int64
-	expr   Interpretable
-	truthy Attribute
-	falsy  Attribute
+	id      int64
+	expr    Interpretable
+	truthy  Attribute
+	falsy   Attribute
+	adapter ref.TypeAdapter
 }
 
 // ID is an implementation of the Attribute interface method.
@@ -184,12 +230,12 @@ func (a *conditionalAttribute) ID() int64 {
 
 // Qualify appends the same qualifier to both sides of the conditional, in effect managing the
 // qualification of alternate attributes.
-func (a *conditionalAttribute) AddQualifier(id int64, v interface{}) (Attribute, error) {
-	_, err := a.truthy.AddQualifier(id, v)
+func (a *conditionalAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
+	_, err := a.truthy.AddQualifier(qual)
 	if err != nil {
 		return nil, err
 	}
-	_, err = a.falsy.AddQualifier(id, v)
+	_, err = a.falsy.AddQualifier(qual)
 	if err != nil {
 		return nil, err
 	}
@@ -197,16 +243,16 @@ func (a *conditionalAttribute) AddQualifier(id int64, v interface{}) (Attribute,
 }
 
 // Resolve evaluates the condition, and then resolves the truthy or falsy branch accordingly.
-func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+func (a *conditionalAttribute) Resolve(vars Activation) (interface{}, error) {
 	val := a.expr.Eval(vars)
 	if types.IsError(val) {
 		return nil, val.Value().(error)
 	}
 	if val == types.True {
-		return a.truthy.Qualify(vars, obj)
+		return a.truthy.Resolve(vars)
 	}
 	if val == types.False {
-		return a.falsy.Qualify(vars, obj)
+		return a.falsy.Resolve(vars)
 	}
 	if types.IsUnknown(val) {
 		return val, nil
@@ -214,26 +260,16 @@ func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interf
 	return nil, types.ValOrErr(val, "no such overload").Value().(error)
 }
 
-// OneofAttribute collects variants of unchecked AbsoluteAttribute values which could either be
-// direct variable accesses or some combination of variable access with qualification.
-func OneofAttribute(adapter ref.TypeAdapter,
-	provider ref.TypeProvider,
-	id int64,
-	namespacedNames []string) Attribute {
-	return &oneofAttribute{
-		id: id,
-		attrs: []*absoluteAttribute{
-			&absoluteAttribute{
-				id:             id,
-				namespaceNames: namespacedNames,
-				qualifiers:     []Qualifier{},
-				provider:       provider,
-				adapter:        adapter,
-			},
-		},
-		adapter:  adapter,
-		provider: provider,
+func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+	val, err := a.Resolve(vars)
+	if err != nil {
+		return nil, err
 	}
+	qual, err := newQualifier(a.adapter, a.id, val)
+	if err != nil {
+		return nil, err
+	}
+	return qual.Qualify(vars, obj)
 }
 
 type oneofAttribute struct {
@@ -250,8 +286,8 @@ func (a *oneofAttribute) ID() int64 {
 
 // Qualify adds a qualifier to each possible attribute variant in the oneof, and also creates a new
 // namespaced variable from the qualified value.
-func (a *oneofAttribute) AddQualifier(id int64, v interface{}) (Attribute, error) {
-	str, isStr := v.(string)
+func (a *oneofAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
+	str, isStr := qual.(*stringQualifier)
 	var augmentedNames []string
 	for _, attr := range a.attrs {
 		if isStr && len(attr.qualifiers) == 0 {
@@ -259,14 +295,14 @@ func (a *oneofAttribute) AddQualifier(id int64, v interface{}) (Attribute, error
 				len(attr.namespaceNames),
 				len(attr.namespaceNames))
 			for i, name := range attr.namespaceNames {
-				augmentedNames[i] = fmt.Sprintf("%s.%s", name, str)
+				augmentedNames[i] = fmt.Sprintf("%s.%s", name, str.value)
 			}
 		}
-		attr.AddQualifier(id, v)
+		attr.AddQualifier(qual)
 	}
 	a.attrs = append([]*absoluteAttribute{
 		&absoluteAttribute{
-			id:             id,
+			id:             qual.ID(),
 			namespaceNames: augmentedNames,
 			qualifiers:     []Qualifier{},
 			adapter:        a.adapter,
@@ -277,7 +313,7 @@ func (a *oneofAttribute) AddQualifier(id int64, v interface{}) (Attribute, error
 }
 
 // Resolve follows the variable resolution
-func (a *oneofAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 	for _, attr := range a.attrs {
 		for _, nm := range attr.namespaceNames {
 			op, found := vars.ResolveName(nm)
@@ -307,6 +343,68 @@ func (a *oneofAttribute) Qualify(vars Activation, obj interface{}) (interface{},
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
+func (a *oneofAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+	val, err := a.Resolve(vars)
+	if err != nil {
+		return nil, err
+	}
+	qual, err := newQualifier(a.adapter, a.id, val)
+	if err != nil {
+		return nil, err
+	}
+	return qual.Qualify(vars, obj)
+}
+
+type relativeAttribute struct {
+	id         int64
+	operand    Interpretable
+	qualifiers []Qualifier
+	adapter    ref.TypeAdapter
+}
+
+// ID is an implementation of the Attribute interface method.
+func (a *relativeAttribute) ID() int64 {
+	return a.id
+}
+
+// Qualify implements the Attribute interface method.
+func (a *relativeAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
+	a.qualifiers = append(a.qualifiers, qual)
+	return a, nil
+}
+
+// Resolve expression value and qualifier relative to the expression result.
+func (a *relativeAttribute) Resolve(vars Activation) (interface{}, error) {
+	v := a.operand.Eval(vars)
+	if types.IsError(v) {
+		return nil, v.Value().(error)
+	}
+	if types.IsUnknown(v) {
+		return v, nil
+	}
+	var err error
+	var obj interface{} = v
+	for _, qual := range a.qualifiers {
+		obj, err = qual.Qualify(vars, obj)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return obj, nil
+}
+
+func (a *relativeAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+	val, err := a.Resolve(vars)
+	if err != nil {
+		return nil, err
+	}
+	qual, err := newQualifier(a.adapter, a.id, val)
+	if err != nil {
+		return nil, err
+	}
+	return qual.Qualify(vars, obj)
+}
+
 func newQualifier(adapter ref.TypeAdapter, id int64, v interface{}) (Qualifier, error) {
 	var qual Qualifier
 	switch val := v.(type) {
@@ -315,40 +413,39 @@ func newQualifier(adapter ref.TypeAdapter, id int64, v interface{}) (Qualifier, 
 	case Qualifier:
 		return val, nil
 	case string:
-		qual = &stringQualifier{id: id, Value: val, CelValue: types.String(val), adapter: adapter}
+		qual = &stringQualifier{id: id, value: val, celValue: types.String(val), adapter: adapter}
+	case int:
+		qual = &intQualifier{id: id, value: int64(val), celValue: types.Int(val), adapter: adapter}
+	case int32:
+		qual = &intQualifier{id: id, value: int64(val), celValue: types.Int(val), adapter: adapter}
 	case int64:
-		qual = &intQualifier{id: id, Value: val, CelValue: types.Int(val), adapter: adapter}
+		qual = &intQualifier{id: id, value: val, celValue: types.Int(val), adapter: adapter}
+	case uint:
+		qual = &uintQualifier{id: id, value: uint64(val), celValue: types.Uint(val), adapter: adapter}
+	case uint32:
+		qual = &uintQualifier{id: id, value: uint64(val), celValue: types.Uint(val), adapter: adapter}
 	case uint64:
-		qual = &uintQualifier{id: id, Value: val, CelValue: types.Uint(val), adapter: adapter}
+		qual = &uintQualifier{id: id, value: val, celValue: types.Uint(val), adapter: adapter}
 	case bool:
-		qual = &boolQualifier{id: id, Value: val, CelValue: types.Bool(val), adapter: adapter}
+		qual = &boolQualifier{id: id, value: val, celValue: types.Bool(val), adapter: adapter}
 	case types.String:
-		qual = &stringQualifier{id: id, Value: string(val), CelValue: val, adapter: adapter}
+		qual = &stringQualifier{id: id, value: string(val), celValue: val, adapter: adapter}
 	case types.Int:
-		qual = &intQualifier{id: id, Value: int64(val), CelValue: val, adapter: adapter}
+		qual = &intQualifier{id: id, value: int64(val), celValue: val, adapter: adapter}
 	case types.Uint:
-		qual = &uintQualifier{id: id, Value: uint64(val), CelValue: val, adapter: adapter}
+		qual = &uintQualifier{id: id, value: uint64(val), celValue: val, adapter: adapter}
 	case types.Bool:
-		qual = &boolQualifier{id: id, Value: bool(val), CelValue: val, adapter: adapter}
+		qual = &boolQualifier{id: id, value: bool(val), celValue: val, adapter: adapter}
 	default:
 		return nil, fmt.Errorf("invalid qualifier type: %T", v)
 	}
 	return qual, nil
 }
 
-// Qualifier marker interface for designating different qualifier values and where they appear
-// within expressions.
-type Qualifier interface {
-	// ID where the qualifier appears within an expression.
-	ID() int64
-
-	Qualify(vars Activation, obj interface{}) (interface{}, error)
-}
-
 type stringQualifier struct {
 	id       int64
-	Value    string
-	CelValue ref.Val
+	value    string
+	celValue ref.Val
 	adapter  ref.TypeAdapter
 }
 
@@ -357,8 +454,12 @@ func (q *stringQualifier) ID() int64 {
 	return q.id
 }
 
+func (q *stringQualifier) Value() interface{} {
+	return q.value
+}
+
 func (q *stringQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
-	s := q.Value
+	s := q.value
 	isMap := false
 	isKey := false
 	switch o := obj.(type) {
@@ -398,7 +499,7 @@ func (q *stringQualifier) Qualify(vars Activation, obj interface{}) (interface{}
 	case types.Unknown:
 		return o, nil
 	default:
-		elem, err := refResolve(q.adapter, q.CelValue, obj)
+		elem, err := refResolve(q.adapter, q.celValue, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -415,8 +516,8 @@ func (q *stringQualifier) Qualify(vars Activation, obj interface{}) (interface{}
 
 type intQualifier struct {
 	id       int64
-	Value    int64
-	CelValue ref.Val
+	value    int64
+	celValue ref.Val
 	adapter  ref.TypeAdapter
 }
 
@@ -426,7 +527,7 @@ func (q *intQualifier) ID() int64 {
 }
 
 func (q *intQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
-	i := q.Value
+	i := q.value
 	isMap := false
 	isKey := false
 	isIndex := false
@@ -498,7 +599,7 @@ func (q *intQualifier) Qualify(vars Activation, obj interface{}) (interface{}, e
 	case types.Unknown:
 		return o, nil
 	default:
-		elem, err := refResolve(q.adapter, q.CelValue, obj)
+		elem, err := refResolve(q.adapter, q.celValue, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -518,8 +619,8 @@ func (q *intQualifier) Qualify(vars Activation, obj interface{}) (interface{}, e
 
 type uintQualifier struct {
 	id       int64
-	Value    uint64
-	CelValue ref.Val
+	value    uint64
+	celValue ref.Val
 	adapter  ref.TypeAdapter
 }
 
@@ -529,7 +630,7 @@ func (q *uintQualifier) ID() int64 {
 }
 
 func (q *uintQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
-	u := q.Value
+	u := q.value
 	isMap := false
 	isKey := false
 	switch o := obj.(type) {
@@ -545,7 +646,7 @@ func (q *uintQualifier) Qualify(vars Activation, obj interface{}) (interface{}, 
 	case types.Unknown:
 		return o, nil
 	default:
-		elem, err := refResolve(q.adapter, q.CelValue, obj)
+		elem, err := refResolve(q.adapter, q.celValue, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -562,8 +663,8 @@ func (q *uintQualifier) Qualify(vars Activation, obj interface{}) (interface{}, 
 
 type boolQualifier struct {
 	id       int64
-	Value    bool
-	CelValue ref.Val
+	value    bool
+	celValue ref.Val
 	adapter  ref.TypeAdapter
 }
 
@@ -573,7 +674,7 @@ func (q *boolQualifier) ID() int64 {
 }
 
 func (q *boolQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
-	b := q.Value
+	b := q.value
 	isKey := false
 	switch o := obj.(type) {
 	case map[bool]interface{}:
@@ -599,7 +700,7 @@ func (q *boolQualifier) Qualify(vars Activation, obj interface{}) (interface{}, 
 	case types.Unknown:
 		return o, nil
 	default:
-		elem, err := refResolve(q.adapter, q.CelValue, obj)
+		elem, err := refResolve(q.adapter, q.celValue, obj)
 		if err != nil {
 			return nil, err
 		}

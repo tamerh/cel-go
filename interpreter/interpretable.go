@@ -52,7 +52,7 @@ func (test *evalTestOnly) Eval(ctx Activation) ref.Val {
 	if test.fieldType != nil {
 		opAttr, ok := test.op.(instAttr)
 		if ok {
-			opVal, err := opAttr.Attr().Qualify(ctx, nil)
+			opVal, err := opAttr.Attr().Resolve(ctx)
 			if err != nil {
 				return types.NewErr(err.Error())
 			}
@@ -650,10 +650,9 @@ func (and *evalExhaustiveAnd) Eval(ctx Activation) ref.Val {
 // evalExhaustiveConditional is like evalConditional, but does not short-circuit argument
 // evaluation.
 type evalExhaustiveConditional struct {
-	id       int64
-	adapter  ref.TypeAdapter
-	resolver Resolver
-	attr     *conditionalAttribute
+	id      int64
+	adapter ref.TypeAdapter
+	attr    *conditionalAttribute
 }
 
 // ID implements the Interpretable interface method.
@@ -664,11 +663,11 @@ func (cond *evalExhaustiveConditional) ID() int64 {
 // Eval implements the Interpretable interface method.
 func (cond *evalExhaustiveConditional) Eval(ctx Activation) ref.Val {
 	cVal := cond.attr.expr.Eval(ctx)
-	tVal, err := cond.attr.truthy.Qualify(ctx, nil)
+	tVal, err := cond.attr.truthy.Resolve(ctx)
 	if err != nil {
 		return types.NewErr(err.Error())
 	}
-	fVal, err := cond.attr.falsy.Qualify(ctx, nil)
+	fVal, err := cond.attr.falsy.Resolve(ctx)
 	if err != nil {
 		return types.NewErr(err.Error())
 	}
@@ -740,14 +739,12 @@ type instAttr interface {
 	Interpretable
 	Attr() Attribute
 	Adapter() ref.TypeAdapter
-	Resolver() Resolver
-	AddQualifier(int64, interface{}) (instAttr, error)
+	AddQualifier(Qualifier) (instAttr, error)
 }
 
 type evalAttr struct {
-	adapter  ref.TypeAdapter
-	resolver Resolver
-	attr     Attribute
+	adapter ref.TypeAdapter
+	attr    Attribute
 }
 
 func (a *evalAttr) ID() int64 {
@@ -762,19 +759,15 @@ func (a *evalAttr) Adapter() ref.TypeAdapter {
 	return a.adapter
 }
 
-func (a *evalAttr) Resolver() Resolver {
-	return a.resolver
-}
-
 func (a *evalAttr) Eval(ctx Activation) ref.Val {
-	v, err := a.attr.Qualify(ctx, nil)
+	v, err := a.attr.Resolve(ctx)
 	if err != nil {
 		return types.NewErr(err.Error())
 	}
 	return a.adapter.NativeToValue(v)
 }
 
-func (a *evalAttr) AddQualifier(id int64, qual interface{}) (instAttr, error) {
-	_, err := a.attr.AddQualifier(id, qual)
+func (a *evalAttr) AddQualifier(qual Qualifier) (instAttr, error) {
+	_, err := a.attr.AddQualifier(qual)
 	return a, err
 }

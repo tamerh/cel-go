@@ -137,7 +137,7 @@ func (e *env) configure(opts ...EnvOption) (Env, error) {
 
 	// Ensure the default resolver is set after the adapter and provider are configured.
 	if e.resolver == nil {
-		e.resolver = interpreter.NewResolver(e.adapter)
+		e.resolver = interpreter.NewResolver(e.pkg, e.adapter, e.provider)
 	}
 
 	// Construct the internal checker env, erroring if there is an issue adding the declarations.

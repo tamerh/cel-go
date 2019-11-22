@@ -73,10 +73,9 @@ func decDisableShortcircuits() InterpretableDecorator {
 			cond, isCond := expr.Attr().(*conditionalAttribute)
 			if isCond {
 				return &evalExhaustiveConditional{
-					id:       cond.id,
-					attr:     cond,
-					adapter:  expr.Adapter(),
-					resolver: expr.Resolver(),
+					id:      cond.id,
+					attr:    cond,
+					adapter: expr.Adapter(),
 				}, nil
 			}
 		case *evalFold:

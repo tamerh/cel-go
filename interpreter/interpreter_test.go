@@ -766,8 +766,9 @@ func TestInterpreter_LogicalAndMissingType(t *testing.T) {
 	}
 
 	reg := types.NewRegistry()
-	res := NewResolver(reg)
-	intr := NewStandardInterpreter(packages.DefaultPackage, reg, reg, res)
+	pkg := packages.DefaultPackage
+	res := NewResolver(pkg, reg, reg)
+	intr := NewStandardInterpreter(pkg, reg, reg, res)
 	i, err := intr.NewUncheckedInterpretable(parsed.GetExpr())
 	if err == nil {
 		t.Errorf("Got '%v', wanted error", i)
@@ -782,9 +783,10 @@ func TestInterpreter_ExhaustiveConditionalExpr(t *testing.T) {
 	}
 
 	state := NewEvalState()
+	pkg := packages.DefaultPackage
 	reg := types.NewRegistry(&exprpb.ParsedExpr{})
-	res := NewResolver(reg)
-	intr := NewStandardInterpreter(packages.DefaultPackage, reg, reg, res)
+	res := NewResolver(pkg, reg, reg)
+	intr := NewStandardInterpreter(pkg, reg, reg, res)
 	interpretable, _ := intr.NewUncheckedInterpretable(
 		parsed.GetExpr(),
 		ExhaustiveEval(state))
@@ -816,8 +818,9 @@ func TestInterpreter_ExhaustiveLogicalOrEquals(t *testing.T) {
 
 	state := NewEvalState()
 	reg := types.NewRegistry(&exprpb.Expr{})
-	res := NewResolver(reg)
-	interp := NewStandardInterpreter(packages.NewPackage("test"), reg, reg, res)
+	pkg := packages.NewPackage("test")
+	res := NewResolver(pkg, reg, reg)
+	interp := NewStandardInterpreter(pkg, reg, reg, res)
 	i, _ := interp.NewUncheckedInterpretable(
 		parsed.GetExpr(),
 		ExhaustiveEval(state))
@@ -854,17 +857,17 @@ func TestInterpreter_SetProto2PrimitiveFields(t *testing.T) {
 		t.Errorf(errors.ToDisplayString())
 	}
 
-	pkgr := packages.NewPackage("google.expr.proto2.test")
+	pkg := packages.NewPackage("google.expr.proto2.test")
 	reg := types.NewRegistry(&proto2pb.TestAllTypes{})
-	res := NewResolver(reg)
-	env := checker.NewStandardEnv(pkgr, reg)
+	env := checker.NewStandardEnv(pkg, reg)
 	env.Add(decls.NewIdent("input", decls.NewObjectType("google.expr.proto2.test.TestAllTypes"), nil))
 	checked, errors := checker.Check(parsed, src, env)
 	if len(errors.GetErrors()) != 0 {
 		t.Errorf(errors.ToDisplayString())
 	}
 
-	i := NewStandardInterpreter(pkgr, reg, reg, res)
+	res := NewResolver(pkg, reg, reg)
+	i := NewStandardInterpreter(pkg, reg, reg, res)
 	eval, _ := i.NewInterpretable(checked)
 	one := int32(1)
 	two := int64(2)
@@ -907,16 +910,17 @@ func TestInterpreter_MissingIdentInSelect(t *testing.T) {
 		t.Fatalf(errors.ToDisplayString())
 	}
 
+	pkg := packages.NewPackage("test")
 	reg := types.NewRegistry()
-	res := NewResolver(reg)
-	env := checker.NewStandardEnv(packages.DefaultPackage, reg)
+	env := checker.NewStandardEnv(pkg, reg)
 	env.Add(decls.NewIdent("a.b", decls.Dyn, nil))
 	checked, errors := checker.Check(parsed, src, env)
 	if len(errors.GetErrors()) != 0 {
 		t.Fatalf(errors.ToDisplayString())
 	}
 
-	interp := NewStandardInterpreter(packages.NewPackage("test"), reg, reg, res)
+	res := NewResolver(pkg, reg, reg)
+	interp := NewStandardInterpreter(pkg, reg, reg, res)
 	i, _ := interp.NewInterpretable(checked)
 	vars := UnknownActivation()
 	result := i.Eval(vars)
@@ -941,7 +945,7 @@ func program(tst *testCase, opts ...InterpretableDecorator) (Interpretable, Acti
 	if tst.types != nil {
 		reg = types.NewRegistry(tst.types...)
 	}
-	res := NewResolver(reg)
+	res := NewResolver(pkg, reg, reg)
 
 	// Configure the environment.
 	env := checker.NewStandardEnv(pkg, reg)

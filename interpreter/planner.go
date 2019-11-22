@@ -137,11 +137,9 @@ func (p *planner) planIdent(expr *exprpb.Expr) (Interpretable, error) {
 	}
 	// Create the possible attribute list for the unresolved reference.
 	ident := expr.GetIdentExpr()
-	names := p.pkg.ResolveCandidateNames(ident.Name)
 	return &evalAttr{
-		adapter:  p.adapter,
-		resolver: p.resolver,
-		attr:     OneofAttribute(p.adapter, p.provider, expr.Id, names),
+		adapter: p.adapter,
+		attr:    p.resolver.OneofAttribute(expr.Id, ident.Name),
 	}, nil
 }
 
@@ -170,9 +168,8 @@ func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interp
 
 	// Otherwise, return the attribute for the resolved identifier name.
 	return &evalAttr{
-		adapter:  p.adapter,
-		resolver: p.resolver,
-		attr:     AbsoluteAttribute(p.adapter, p.provider, id, []string{identRef.Name}),
+		adapter: p.adapter,
+		attr:    p.resolver.AbsoluteAttribute(id, identRef.Name),
 	}, nil
 }
 
@@ -224,26 +221,25 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 			op:        op,
 		}, nil
 	}
-
-	var qual interface{} = sel.Field
-	if fieldType != nil {
-		qual = FieldQualifier(p.adapter, expr.Id, sel.Field, fieldType)
+	// Build a qualifier.
+	qual, err := p.resolver.NewQualifier(opType, expr.Id, sel.Field)
+	if err != nil {
+		return nil, err
 	}
-
 	// Lastly, create a field selection Interpretable.
 	attr, isAttr := op.(instAttr)
 	if isAttr {
-		return attr.AddQualifier(expr.Id, qual)
+		return attr.AddQualifier(qual)
 	}
-	relAttr := RelativeAttribute(p.adapter, op.ID(), op)
-	_, err = relAttr.AddQualifier(expr.Id, qual)
+
+	relAttr := p.resolver.RelativeAttribute(op.ID(), op)
+	_, err = relAttr.AddQualifier(qual)
 	if err != nil {
 		return nil, err
 	}
 	return &evalAttr{
-		adapter:  p.adapter,
-		resolver: p.resolver,
-		attr:     relAttr,
+		adapter: p.adapter,
+		attr:    relAttr,
 	}, nil
 }
 
@@ -459,7 +455,7 @@ func (p *planner) planCallConditional(expr *exprpb.Expr,
 	if isTruthyAttr {
 		tAttr = truthyAttr.Attr()
 	} else {
-		tAttr = RelativeAttribute(p.adapter, t.ID(), t)
+		tAttr = p.resolver.RelativeAttribute(t.ID(), t)
 	}
 
 	f := args[2]
@@ -468,13 +464,12 @@ func (p *planner) planCallConditional(expr *exprpb.Expr,
 	if isFalsyAttr {
 		fAttr = falsyAttr.Attr()
 	} else {
-		fAttr = RelativeAttribute(p.adapter, f.ID(), f)
+		fAttr = p.resolver.RelativeAttribute(f.ID(), f)
 	}
 
 	return &evalAttr{
-		adapter:  p.adapter,
-		resolver: p.resolver,
-		attr:     ConditionalAttribute(expr.Id, cond, tAttr, fAttr),
+		adapter: p.adapter,
+		attr:    p.resolver.ConditionalAttribute(expr.Id, cond, tAttr, fAttr),
 	}, nil
 }
 
@@ -487,18 +482,23 @@ func (p *planner) planCallIndex(expr *exprpb.Expr,
 	opAttr, isOpAttr := op.(instAttr)
 	if !isOpAttr {
 		opAttr = &evalAttr{
-			adapter:  p.adapter,
-			resolver: p.resolver,
-			attr:     RelativeAttribute(p.adapter, expr.Id, op),
+			adapter: p.adapter,
+			attr:    p.resolver.RelativeAttribute(expr.Id, op),
 		}
 	}
 	indConst, isIndConst := ind.(instConst)
 	if isIndConst {
-		return opAttr.AddQualifier(indConst.ID(), indConst.Value())
+		opType := p.typeMap[op.ID()]
+		qual, err := p.resolver.NewQualifier(
+			opType, indConst.ID(), indConst.Value())
+		if err != nil {
+			return nil, err
+		}
+		return opAttr.AddQualifier(qual)
 	}
 	indAttr, isIndAttr := ind.(instAttr)
 	if isIndAttr {
-		return opAttr.AddQualifier(indAttr.ID(), indAttr.Attr())
+		return opAttr.AddQualifier(indAttr.Attr())
 	}
 	return nil, fmt.Errorf("unsupported index expression: %v", expr)
 }

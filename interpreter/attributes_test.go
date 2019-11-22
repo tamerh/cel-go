@@ -33,12 +33,16 @@ func TestAttributes_AbsoluteAttr(t *testing.T) {
 		},
 	})
 
-	pkgr := packages.NewPackage("acme.ns")
-	attr := AbsoluteAttribute(reg, reg, 1, pkgr.ResolveCandidateNames("a"))
-	attr.AddQualifier(2, "b")
-	attr.AddQualifier(3, uint64(4))
-	attr.AddQualifier(4, false)
-	out, err := attr.Qualify(vars, nil)
+	pkg := packages.NewPackage("acme.ns")
+	res := NewResolver(pkg, reg, reg)
+	attr := res.AbsoluteAttribute(1, "acme.a")
+	qualB, _ := res.NewQualifier(nil, 2, "b")
+	qual4, _ := res.NewQualifier(nil, 3, uint64(4))
+	qualFalse, _ := res.NewQualifier(nil, 4, false)
+	attr.AddQualifier(qualB)
+	attr.AddQualifier(qual4)
+	attr.AddQualifier(qualFalse)
+	out, err := attr.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,8 +53,9 @@ func TestAttributes_AbsoluteAttr(t *testing.T) {
 
 func TestAttributes_AbsoluteAttr_Type(t *testing.T) {
 	reg := types.NewRegistry()
-	attr := AbsoluteAttribute(reg, reg, 1, []string{"int"})
-	out, err := attr.Qualify(EmptyActivation(), nil)
+	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attr := res.AbsoluteAttribute(1, "int")
+	out, err := attr.Resolve(EmptyActivation())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,11 +78,14 @@ func TestAttributes_RelativeAttr(t *testing.T) {
 		id:  1,
 		val: reg.NativeToValue(data),
 	}
-	attr := RelativeAttribute(reg, 1, op)
-	attr.AddQualifier(2, "a")
-	attr.AddQualifier(3, int64(-1))
-	attr.AddQualifier(4, AbsoluteAttribute(reg, reg, 4, []string{"b"}))
-	out, err := attr.Qualify(vars, nil)
+	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attr := res.RelativeAttribute(1, op)
+	qualA, _ := res.NewQualifier(nil, 2, "a")
+	qualNeg1, _ := res.NewQualifier(nil, 3, int64(-1))
+	attr.AddQualifier(qualA)
+	attr.AddQualifier(qualNeg1)
+	attr.AddQualifier(res.AbsoluteAttribute(4, "b"))
+	out, err := attr.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,9 +96,11 @@ func TestAttributes_RelativeAttr(t *testing.T) {
 
 func TestAttributes_OneofAttr(t *testing.T) {
 	reg := types.NewRegistry()
-	pkgr := packages.NewPackage("acme.ns")
-	attr := OneofAttribute(reg, reg, 1, pkgr.ResolveCandidateNames("a"))
-	attr.AddQualifier(2, "b")
+	pkg := packages.NewPackage("acme.ns")
+	res := NewResolver(pkg, reg, reg)
+	attr := res.OneofAttribute(1, "a")
+	qualB, _ := res.NewQualifier(nil, 2, "b")
+	attr.AddQualifier(qualB)
 
 	data := map[string]interface{}{
 		"a": map[string]interface{}{
@@ -100,7 +110,7 @@ func TestAttributes_OneofAttr(t *testing.T) {
 		"acme.ns.a.b": "found",
 	}
 	vars, _ := NewActivation(data)
-	out, err := attr.Qualify(vars, nil)
+	out, err := attr.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,13 +132,17 @@ func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 		},
 	}
 	vars, _ := NewActivation(data)
-	tv := AbsoluteAttribute(reg, reg, 2, []string{"a"})
-	fv := OneofAttribute(reg, reg, 3, []string{"b"})
-	fv.AddQualifier(4, "c")
-	cond := ConditionalAttribute(1, &evalConst{val: types.True}, tv, fv)
-	cond.AddQualifier(5, int64(-1))
-	cond.AddQualifier(6, int64(1))
-	out, err := cond.Qualify(vars, nil)
+	res := NewResolver(packages.DefaultPackage, reg, reg)
+	tv := res.AbsoluteAttribute(2, "a")
+	fv := res.OneofAttribute(3, "b")
+	qualC, _ := res.NewQualifier(nil, 4, "c")
+	fv.AddQualifier(qualC)
+	cond := res.ConditionalAttribute(1, &evalConst{val: types.True}, tv, fv)
+	qualNeg1, _ := res.NewQualifier(nil, 5, int64(-1))
+	qual1, _ := res.NewQualifier(nil, 6, int64(1))
+	cond.AddQualifier(qualNeg1)
+	cond.AddQualifier(qual1)
+	out, err := cond.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,13 +164,17 @@ func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 		},
 	}
 	vars, _ := NewActivation(data)
-	tv := AbsoluteAttribute(reg, reg, 2, []string{"a"})
-	fv := OneofAttribute(reg, reg, 3, []string{"b"})
-	fv.AddQualifier(4, "c")
-	cond := ConditionalAttribute(1, &evalConst{val: types.False}, tv, fv)
-	cond.AddQualifier(5, int64(-1))
-	cond.AddQualifier(6, int64(1))
-	out, err := cond.Qualify(vars, nil)
+	res := NewResolver(packages.DefaultPackage, reg, reg)
+	tv := res.AbsoluteAttribute(2, "a")
+	fv := res.OneofAttribute(3, "b")
+	qualC, _ := res.NewQualifier(nil, 4, "c")
+	fv.AddQualifier(qualC)
+	cond := res.ConditionalAttribute(1, &evalConst{val: types.False}, tv, fv)
+	qualNeg1, _ := res.NewQualifier(nil, 5, int64(-1))
+	qual1, _ := res.NewQualifier(nil, 6, int64(1))
+	cond.AddQualifier(qualNeg1)
+	cond.AddQualifier(qual1)
+	out, err := cond.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,16 +185,17 @@ func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 
 func TestAttributes_ConditionalAttr_ErrorUnknown(t *testing.T) {
 	reg := types.NewRegistry()
-	tv := AbsoluteAttribute(reg, reg, 2, []string{"a"})
-	fv := OneofAttribute(reg, reg, 3, []string{"b"})
-	cond := ConditionalAttribute(1, &evalConst{val: types.NewErr("test error")}, tv, fv)
-	out, err := cond.Qualify(EmptyActivation(), nil)
+	res := NewResolver(packages.DefaultPackage, reg, reg)
+	tv := res.AbsoluteAttribute(2, "a")
+	fv := res.OneofAttribute(3, "b")
+	cond := res.ConditionalAttribute(1, &evalConst{val: types.NewErr("test error")}, tv, fv)
+	out, err := cond.Resolve(EmptyActivation())
 	if err == nil {
 		t.Errorf("Got %v, wanted error", out)
 	}
 
-	condUnk := ConditionalAttribute(1, &evalConst{val: types.Unknown{1}}, tv, fv)
-	out, err = condUnk.Qualify(EmptyActivation(), nil)
+	condUnk := res.ConditionalAttribute(1, &evalConst{val: types.Unknown{1}}, tv, fv)
+	out, err = condUnk.Resolve(EmptyActivation())
 	if err != nil {
 		t.Fatal(err)
 	}
