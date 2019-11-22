@@ -23,7 +23,6 @@ import (
 
 func TestAttributes_AbsoluteAttr(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
 	vars, _ := NewActivation(map[string]interface{}{
 		"acme.a": map[string]interface{}{
 			"b": map[uint]interface{}{
@@ -35,11 +34,11 @@ func TestAttributes_AbsoluteAttr(t *testing.T) {
 	})
 
 	pkgr := packages.NewPackage("acme.ns")
-	attr := AbsoluteAttribute(1, pkgr.ResolveCandidateNames("a"))
-	attr.Qualify(2, "b")
-	attr.Qualify(3, uint64(4))
-	attr.Qualify(4, false)
-	out, err := attr.Resolve(vars, res)
+	attr := AbsoluteAttribute(reg, reg, 1, pkgr.ResolveCandidateNames("a"))
+	attr.AddQualifier(2, "b")
+	attr.AddQualifier(3, uint64(4))
+	attr.AddQualifier(4, false)
+	out, err := attr.Qualify(vars, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,9 +49,8 @@ func TestAttributes_AbsoluteAttr(t *testing.T) {
 
 func TestAttributes_AbsoluteAttr_Type(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
-	attr := AbsoluteAttribute(1, []string{"int"})
-	out, err := attr.Resolve(EmptyActivation(), res)
+	attr := AbsoluteAttribute(reg, reg, 1, []string{"int"})
+	out, err := attr.Qualify(EmptyActivation(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +61,6 @@ func TestAttributes_AbsoluteAttr_Type(t *testing.T) {
 
 func TestAttributes_RelativeAttr(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -76,11 +73,11 @@ func TestAttributes_RelativeAttr(t *testing.T) {
 		id:  1,
 		val: reg.NativeToValue(data),
 	}
-	attr := RelativeAttribute(1, op)
-	attr.Qualify(2, "a")
-	attr.Qualify(3, int64(-1))
-	attr.Qualify(4, AbsoluteAttribute(4, []string{"b"}))
-	out, err := attr.Resolve(vars, res)
+	attr := RelativeAttribute(reg, 1, op)
+	attr.AddQualifier(2, "a")
+	attr.AddQualifier(3, int64(-1))
+	attr.AddQualifier(4, AbsoluteAttribute(reg, reg, 4, []string{"b"}))
+	out, err := attr.Qualify(vars, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,12 +87,11 @@ func TestAttributes_RelativeAttr(t *testing.T) {
 }
 
 func TestAttributes_OneofAttr(t *testing.T) {
-	pkgr := packages.NewPackage("acme.ns")
-	attr := OneofAttribute(1, pkgr.ResolveCandidateNames("a"))
-	attr.Qualify(2, "b")
-
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
+	pkgr := packages.NewPackage("acme.ns")
+	attr := OneofAttribute(reg, reg, 1, pkgr.ResolveCandidateNames("a"))
+	attr.AddQualifier(2, "b")
+
 	data := map[string]interface{}{
 		"a": map[string]interface{}{
 			"b": []int32{2, 42},
@@ -104,7 +100,7 @@ func TestAttributes_OneofAttr(t *testing.T) {
 		"acme.ns.a.b": "found",
 	}
 	vars, _ := NewActivation(data)
-	out, err := attr.Resolve(vars, res)
+	out, err := attr.Qualify(vars, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +111,6 @@ func TestAttributes_OneofAttr(t *testing.T) {
 
 func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -127,13 +122,13 @@ func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 		},
 	}
 	vars, _ := NewActivation(data)
-	tv := AbsoluteAttribute(2, []string{"a"})
-	fv := OneofAttribute(3, []string{"b"})
-	fv.Qualify(4, "c")
+	tv := AbsoluteAttribute(reg, reg, 2, []string{"a"})
+	fv := OneofAttribute(reg, reg, 3, []string{"b"})
+	fv.AddQualifier(4, "c")
 	cond := ConditionalAttribute(1, &evalConst{val: types.True}, tv, fv)
-	cond.Qualify(5, int64(-1))
-	cond.Qualify(6, int64(1))
-	out, err := cond.Resolve(vars, res)
+	cond.AddQualifier(5, int64(-1))
+	cond.AddQualifier(6, int64(1))
+	out, err := cond.Qualify(vars, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +139,6 @@ func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 
 func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -156,13 +150,13 @@ func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 		},
 	}
 	vars, _ := NewActivation(data)
-	tv := AbsoluteAttribute(2, []string{"a"})
-	fv := OneofAttribute(3, []string{"b"})
-	fv.Qualify(4, "c")
+	tv := AbsoluteAttribute(reg, reg, 2, []string{"a"})
+	fv := OneofAttribute(reg, reg, 3, []string{"b"})
+	fv.AddQualifier(4, "c")
 	cond := ConditionalAttribute(1, &evalConst{val: types.False}, tv, fv)
-	cond.Qualify(5, int64(-1))
-	cond.Qualify(6, int64(1))
-	out, err := cond.Resolve(vars, res)
+	cond.AddQualifier(5, int64(-1))
+	cond.AddQualifier(6, int64(1))
+	out, err := cond.Qualify(vars, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,44 +167,21 @@ func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 
 func TestAttributes_ConditionalAttr_ErrorUnknown(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
-	tv := AbsoluteAttribute(2, []string{"a"})
-	fv := OneofAttribute(3, []string{"b"})
+	tv := AbsoluteAttribute(reg, reg, 2, []string{"a"})
+	fv := OneofAttribute(reg, reg, 3, []string{"b"})
 	cond := ConditionalAttribute(1, &evalConst{val: types.NewErr("test error")}, tv, fv)
-	out, err := cond.Resolve(EmptyActivation(), res)
+	out, err := cond.Qualify(EmptyActivation(), nil)
 	if err == nil {
 		t.Errorf("Got %v, wanted error", out)
 	}
 
 	condUnk := ConditionalAttribute(1, &evalConst{val: types.Unknown{1}}, tv, fv)
-	out, err = condUnk.Resolve(EmptyActivation(), res)
+	out, err = condUnk.Qualify(EmptyActivation(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	unk, ok := out.(types.Unknown)
 	if !ok || !types.IsUnknown(unk) {
 		t.Errorf("Got %v, wanted unknown", out)
-	}
-}
-
-func BenchmarkAttributes_ResolveAttr(b *testing.B) {
-	tc := map[string]interface{}{
-		"a": map[string]interface{}{
-			"b": map[string]interface{}{
-				"c": []interface{}{"d", "e"},
-			},
-		},
-	}
-	vars, _ := NewActivation(map[string]interface{}{
-		"tc": tc,
-	})
-	res := &resolver{}
-	attr := AbsoluteAttribute(1, []string{"tc"})
-	attr.Qualify(2, "a")
-	attr.Qualify(3, "b")
-	attr.Qualify(4, "c")
-	attr.Qualify(5, int64(1))
-	for n := 0; n < b.N; n++ {
-		attr.Resolve(vars, res)
 	}
 }

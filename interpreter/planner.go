@@ -141,7 +141,7 @@ func (p *planner) planIdent(expr *exprpb.Expr) (Interpretable, error) {
 	return &evalAttr{
 		adapter:  p.adapter,
 		resolver: p.resolver,
-		attr:     OneofAttribute(expr.Id, names),
+		attr:     OneofAttribute(p.adapter, p.provider, expr.Id, names),
 	}, nil
 }
 
@@ -172,7 +172,7 @@ func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interp
 	return &evalAttr{
 		adapter:  p.adapter,
 		resolver: p.resolver,
-		attr:     AbsoluteAttribute(id, []string{identRef.Name}),
+		attr:     AbsoluteAttribute(p.adapter, p.provider, id, []string{identRef.Name}),
 	}, nil
 }
 
@@ -227,16 +227,16 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 
 	var qual interface{} = sel.Field
 	if fieldType != nil {
-		qual = FieldQualifier(expr.Id, sel.Field, fieldType)
+		qual = FieldQualifier(p.adapter, expr.Id, sel.Field, fieldType)
 	}
 
 	// Lastly, create a field selection Interpretable.
 	attr, isAttr := op.(instAttr)
 	if isAttr {
-		return attr.Qualify(expr.Id, qual)
+		return attr.AddQualifier(expr.Id, qual)
 	}
-	relAttr := RelativeAttribute(op.ID(), op)
-	_, err = relAttr.Qualify(expr.Id, qual)
+	relAttr := RelativeAttribute(p.adapter, op.ID(), op)
+	_, err = relAttr.AddQualifier(expr.Id, qual)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func (p *planner) planCallConditional(expr *exprpb.Expr,
 	if isTruthyAttr {
 		tAttr = truthyAttr.Attr()
 	} else {
-		tAttr = RelativeAttribute(t.ID(), t)
+		tAttr = RelativeAttribute(p.adapter, t.ID(), t)
 	}
 
 	f := args[2]
@@ -468,7 +468,7 @@ func (p *planner) planCallConditional(expr *exprpb.Expr,
 	if isFalsyAttr {
 		fAttr = falsyAttr.Attr()
 	} else {
-		fAttr = RelativeAttribute(f.ID(), f)
+		fAttr = RelativeAttribute(p.adapter, f.ID(), f)
 	}
 
 	return &evalAttr{
@@ -489,16 +489,16 @@ func (p *planner) planCallIndex(expr *exprpb.Expr,
 		opAttr = &evalAttr{
 			adapter:  p.adapter,
 			resolver: p.resolver,
-			attr:     RelativeAttribute(expr.Id, op),
+			attr:     RelativeAttribute(p.adapter, expr.Id, op),
 		}
 	}
 	indConst, isIndConst := ind.(instConst)
 	if isIndConst {
-		return opAttr.Qualify(indConst.ID(), indConst.Value())
+		return opAttr.AddQualifier(indConst.ID(), indConst.Value())
 	}
 	indAttr, isIndAttr := ind.(instAttr)
 	if isIndAttr {
-		return opAttr.Qualify(indAttr.ID(), indAttr.Attr())
+		return opAttr.AddQualifier(indAttr.ID(), indAttr.Attr())
 	}
 	return nil, fmt.Errorf("unsupported index expression: %v", expr)
 }

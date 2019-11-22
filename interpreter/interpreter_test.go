@@ -766,7 +766,7 @@ func TestInterpreter_LogicalAndMissingType(t *testing.T) {
 	}
 
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
+	res := NewResolver(reg)
 	intr := NewStandardInterpreter(packages.DefaultPackage, reg, reg, res)
 	i, err := intr.NewUncheckedInterpretable(parsed.GetExpr())
 	if err == nil {
@@ -783,7 +783,7 @@ func TestInterpreter_ExhaustiveConditionalExpr(t *testing.T) {
 
 	state := NewEvalState()
 	reg := types.NewRegistry(&exprpb.ParsedExpr{})
-	res := NewResolver(reg, reg)
+	res := NewResolver(reg)
 	intr := NewStandardInterpreter(packages.DefaultPackage, reg, reg, res)
 	interpretable, _ := intr.NewUncheckedInterpretable(
 		parsed.GetExpr(),
@@ -816,7 +816,7 @@ func TestInterpreter_ExhaustiveLogicalOrEquals(t *testing.T) {
 
 	state := NewEvalState()
 	reg := types.NewRegistry(&exprpb.Expr{})
-	res := NewResolver(reg, reg)
+	res := NewResolver(reg)
 	interp := NewStandardInterpreter(packages.NewPackage("test"), reg, reg, res)
 	i, _ := interp.NewUncheckedInterpretable(
 		parsed.GetExpr(),
@@ -856,7 +856,7 @@ func TestInterpreter_SetProto2PrimitiveFields(t *testing.T) {
 
 	pkgr := packages.NewPackage("google.expr.proto2.test")
 	reg := types.NewRegistry(&proto2pb.TestAllTypes{})
-	res := NewResolver(reg, reg)
+	res := NewResolver(reg)
 	env := checker.NewStandardEnv(pkgr, reg)
 	env.Add(decls.NewIdent("input", decls.NewObjectType("google.expr.proto2.test.TestAllTypes"), nil))
 	checked, errors := checker.Check(parsed, src, env)
@@ -908,7 +908,7 @@ func TestInterpreter_MissingIdentInSelect(t *testing.T) {
 	}
 
 	reg := types.NewRegistry()
-	res := NewResolver(reg, reg)
+	res := NewResolver(reg)
 	env := checker.NewStandardEnv(packages.DefaultPackage, reg)
 	env.Add(decls.NewIdent("a.b", decls.Dyn, nil))
 	checked, errors := checker.Check(parsed, src, env)
@@ -941,7 +941,7 @@ func program(tst *testCase, opts ...InterpretableDecorator) (Interpretable, Acti
 	if tst.types != nil {
 		reg = types.NewRegistry(tst.types...)
 	}
-	res := NewResolver(reg, reg)
+	res := NewResolver(reg)
 
 	// Configure the environment.
 	env := checker.NewStandardEnv(pkg, reg)

@@ -52,7 +52,7 @@ func (test *evalTestOnly) Eval(ctx Activation) ref.Val {
 	if test.fieldType != nil {
 		opAttr, ok := test.op.(instAttr)
 		if ok {
-			opVal, err := opAttr.Attr().Resolve(ctx, opAttr.Resolver())
+			opVal, err := opAttr.Attr().Qualify(ctx, nil)
 			if err != nil {
 				return types.NewErr(err.Error())
 			}
@@ -664,11 +664,11 @@ func (cond *evalExhaustiveConditional) ID() int64 {
 // Eval implements the Interpretable interface method.
 func (cond *evalExhaustiveConditional) Eval(ctx Activation) ref.Val {
 	cVal := cond.attr.expr.Eval(ctx)
-	tVal, err := cond.attr.truthy.Resolve(ctx, cond.resolver)
+	tVal, err := cond.attr.truthy.Qualify(ctx, nil)
 	if err != nil {
 		return types.NewErr(err.Error())
 	}
-	fVal, err := cond.attr.falsy.Resolve(ctx, cond.resolver)
+	fVal, err := cond.attr.falsy.Qualify(ctx, nil)
 	if err != nil {
 		return types.NewErr(err.Error())
 	}
@@ -741,7 +741,7 @@ type instAttr interface {
 	Attr() Attribute
 	Adapter() ref.TypeAdapter
 	Resolver() Resolver
-	Qualify(int64, interface{}) (instAttr, error)
+	AddQualifier(int64, interface{}) (instAttr, error)
 }
 
 type evalAttr struct {
@@ -767,14 +767,14 @@ func (a *evalAttr) Resolver() Resolver {
 }
 
 func (a *evalAttr) Eval(ctx Activation) ref.Val {
-	v, err := a.attr.Resolve(ctx, a.resolver)
+	v, err := a.attr.Qualify(ctx, nil)
 	if err != nil {
 		return types.NewErr(err.Error())
 	}
 	return a.adapter.NativeToValue(v)
 }
 
-func (a *evalAttr) Qualify(id int64, qual interface{}) (instAttr, error) {
-	_, err := a.attr.Qualify(id, qual)
+func (a *evalAttr) AddQualifier(id int64, qual interface{}) (instAttr, error) {
+	_, err := a.attr.AddQualifier(id, qual)
 	return a, err
 }
