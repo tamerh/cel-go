@@ -29,17 +29,32 @@ import (
 // Resolver provides methods for finding values by name and resolving qualified attributes from
 // them.
 type Resolver interface {
+	// AbsoluteAttribute creates an attribute that refers to a top-level variable name.
+	//
+	// Only type-checked expressions generate absolute attributes.
 	AbsoluteAttribute(id int64, name string) Attribute
 
+	// ConditionalAttribute creates an attribute with two Attribute branches, where the Attribute
+	// that is resolved depends on the boolean evaluation of the input 'expr'.
 	ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute
 
+	// OneofAttribute creates an attribute that refers to either a field selection or a namespaced
+	// variable name.
+	//
+	// Only expressions which have not been type-checked may generate oneof attributes.
 	OneofAttribute(id int64, name string) Attribute
 
+	// RelativeAttribute creates an attribute whose value is a qualification of a dynamic
+	// computation rather than a static variable reference.
 	RelativeAttribute(id int64, operand Interpretable) Attribute
 
 	// NewQualifier creates a qualifier on the target object with a given value.
 	//
 	// The 'val' may be an Attribute or any proto-supported map key type: bool, int, string, uint.
+	//
+	// The qualifier may consider the object type being qualified, if present. If absent, the
+	// qualification should be considered dynamic and the qualification should still work, though
+	// it may be sub-optimal.
 	NewQualifier(objType *exprpb.Type, qualID int64, val interface{}) (Qualifier, error)
 }
 
@@ -49,6 +64,8 @@ type Qualifier interface {
 	// ID where the qualifier appears within an expression.
 	ID() int64
 
+	// Qualify performs a qualification, e.g. field selection, on the input object and returns
+	// the value or error that results.
 	Qualify(vars Activation, obj interface{}) (interface{}, error)
 }
 
@@ -57,10 +74,11 @@ type Qualifier interface {
 type Attribute interface {
 	Qualifier
 
-	// Qualify adds an additional qualifier on the Attribute or error if the qualification is not
-	// a supported proto map key type.
+	// AddQualifier adds a qualifier on the Attribute or error if the qualification is not a valid
+	// qualifier type.
 	AddQualifier(Qualifier) (Attribute, error)
 
+	// Resolve returns the value of the Attribute given the current Activation.
 	Resolve(Activation) (interface{}, error)
 }
 
@@ -94,6 +112,7 @@ func (r *resolver) AbsoluteAttribute(id int64, name string) Attribute {
 		qualifiers:     []Qualifier{},
 		adapter:        r.adapter,
 		provider:       r.provider,
+		res:            r,
 	}
 }
 
@@ -106,6 +125,7 @@ func (r *resolver) ConditionalAttribute(id int64, expr Interpretable, t, f Attri
 		truthy:  t,
 		falsy:   f,
 		adapter: r.adapter,
+		res:     r,
 	}
 }
 
@@ -121,10 +141,12 @@ func (r *resolver) OneofAttribute(id int64, name string) Attribute {
 				qualifiers:     []Qualifier{},
 				provider:       r.provider,
 				adapter:        r.adapter,
+				res:            r,
 			},
 		},
 		adapter:  r.adapter,
 		provider: r.provider,
+		res:      r,
 	}
 }
 
@@ -135,9 +157,11 @@ func (r *resolver) RelativeAttribute(id int64, operand Interpretable) Attribute 
 		operand:    operand,
 		qualifiers: []Qualifier{},
 		adapter:    r.adapter,
+		res:        r,
 	}
 }
 
+// NewQualifier is an implementation of the Resolver interface.
 func (r *resolver) NewQualifier(objType *exprpb.Type,
 	qualID int64,
 	val interface{}) (Qualifier, error) {
@@ -157,6 +181,7 @@ type absoluteAttribute struct {
 	qualifiers     []Qualifier
 	adapter        ref.TypeAdapter
 	provider       ref.TypeProvider
+	res            Resolver
 }
 
 // ID implements the Attribute interface method.
@@ -164,7 +189,7 @@ func (a *absoluteAttribute) ID() int64 {
 	return a.id
 }
 
-// Qualify implements the Attribute interface method.
+// AddQualifier implements the Attribute interface method.
 func (a *absoluteAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 	a.qualifiers = append(a.qualifiers, qual)
 	return a, nil
@@ -203,12 +228,13 @@ func (a *absoluteAttribute) Resolve(vars Activation) (interface{}, error) {
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
+// Qualify is an implementation of the Resolver interface method.
 func (a *absoluteAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
 	}
-	qual, err := newQualifier(a.adapter, a.id, val)
+	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
 		return nil, err
 	}
@@ -221,6 +247,7 @@ type conditionalAttribute struct {
 	truthy  Attribute
 	falsy   Attribute
 	adapter ref.TypeAdapter
+	res     Resolver
 }
 
 // ID is an implementation of the Attribute interface method.
@@ -228,8 +255,8 @@ func (a *conditionalAttribute) ID() int64 {
 	return a.id
 }
 
-// Qualify appends the same qualifier to both sides of the conditional, in effect managing the
-// qualification of alternate attributes.
+// AddQualifier appends the same qualifier to both sides of the conditional, in effect managing
+// the qualification of alternate attributes.
 func (a *conditionalAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 	_, err := a.truthy.AddQualifier(qual)
 	if err != nil {
@@ -260,12 +287,13 @@ func (a *conditionalAttribute) Resolve(vars Activation) (interface{}, error) {
 	return nil, types.ValOrErr(val, "no such overload").Value().(error)
 }
 
+// Qualify is an implementation of the Resolver interface method.
 func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
 	}
-	qual, err := newQualifier(a.adapter, a.id, val)
+	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
 		return nil, err
 	}
@@ -277,6 +305,7 @@ type oneofAttribute struct {
 	attrs    []*absoluteAttribute
 	adapter  ref.TypeAdapter
 	provider ref.TypeProvider
+	res      Resolver
 }
 
 // ID is an implementation of the Attribute interface method.
@@ -284,8 +313,8 @@ func (a *oneofAttribute) ID() int64 {
 	return a.id
 }
 
-// Qualify adds a qualifier to each possible attribute variant in the oneof, and also creates a new
-// namespaced variable from the qualified value.
+// AddQualifier adds a qualifier to each possible attribute variant in the oneof, and also creates
+// a new namespaced variable from the qualified value.
 func (a *oneofAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 	str, isStr := qual.(*stringQualifier)
 	var augmentedNames []string
@@ -307,12 +336,14 @@ func (a *oneofAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 			qualifiers:     []Qualifier{},
 			adapter:        a.adapter,
 			provider:       a.provider,
+			res:            a.res,
 		},
 	}, a.attrs...)
 	return a, nil
 }
 
-// Resolve follows the variable resolution
+// Resolve follows the variable resolution rules to determine whether the attribute is a variable
+// or a field selection.
 func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 	for _, attr := range a.attrs {
 		for _, nm := range attr.namespaceNames {
@@ -343,12 +374,13 @@ func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
+// Qualify is an implementation of the Resolver interface method.
 func (a *oneofAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
 	}
-	qual, err := newQualifier(a.adapter, a.id, val)
+	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
 		return nil, err
 	}
@@ -360,6 +392,7 @@ type relativeAttribute struct {
 	operand    Interpretable
 	qualifiers []Qualifier
 	adapter    ref.TypeAdapter
+	res        Resolver
 }
 
 // ID is an implementation of the Attribute interface method.
@@ -367,7 +400,7 @@ func (a *relativeAttribute) ID() int64 {
 	return a.id
 }
 
-// Qualify implements the Attribute interface method.
+// AddQualifier implements the Attribute interface method.
 func (a *relativeAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 	a.qualifiers = append(a.qualifiers, qual)
 	return a, nil
@@ -393,12 +426,13 @@ func (a *relativeAttribute) Resolve(vars Activation) (interface{}, error) {
 	return obj, nil
 }
 
+// Qualify is an implementation of the Resolver interface method.
 func (a *relativeAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
 	}
-	qual, err := newQualifier(a.adapter, a.id, val)
+	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
 		return nil, err
 	}
@@ -409,8 +443,6 @@ func newQualifier(adapter ref.TypeAdapter, id int64, v interface{}) (Qualifier, 
 	var qual Qualifier
 	switch val := v.(type) {
 	case Attribute:
-		return val, nil
-	case Qualifier:
 		return val, nil
 	case string:
 		qual = &stringQualifier{id: id, value: val, celValue: types.String(val), adapter: adapter}
@@ -452,10 +484,6 @@ type stringQualifier struct {
 // ID is an implementation of the Qualifier interface method.
 func (q *stringQualifier) ID() int64 {
 	return q.id
-}
-
-func (q *stringQualifier) Value() interface{} {
-	return q.value
 }
 
 func (q *stringQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {

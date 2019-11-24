@@ -222,7 +222,8 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 		}, nil
 	}
 	// Build a qualifier.
-	qual, err := p.resolver.NewQualifier(opType, expr.Id, sel.Field)
+	qual, err := p.resolver.NewQualifier(
+		opType, expr.Id, sel.Field)
 	if err != nil {
 		return nil, err
 	}

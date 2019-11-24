@@ -537,10 +537,10 @@ func (e *evalWatch) Eval(ctx Activation) ref.Val {
 	return val
 }
 
-// evalWatchAttr describes a watcher of an attrInst interpretable.
+// evalWatchAttr describes a watcher of an instAttr Interpretable.
 //
 // Since the watcher may be selected against at a later stage in program planning, the watcher
-// must implement the attrInst interface by proxy.
+// must implement the instAttr interface by proxy.
 type evalWatchAttr struct {
 	instAttr
 	observer evalObserver
@@ -553,6 +553,7 @@ func (e *evalWatchAttr) Eval(vars Activation) ref.Val {
 	return val
 }
 
+// evalWatchConst describes a watcher of an instConst Interpretable.
 type evalWatchConst struct {
 	instConst
 	observer evalObserver
@@ -730,15 +731,25 @@ func (fold *evalExhaustiveFold) Eval(ctx Activation) ref.Val {
 	return res
 }
 
+// instConst interface for tracking whether the Interpretable is a constant value.
 type instConst interface {
 	Interpretable
+
+	// Value returns the constant value of the instruction.
 	Value() ref.Val
 }
 
+// instAttr interface for tracking whether the Interpretable is an attribute.
 type instAttr interface {
 	Interpretable
+
+	// Attr returns the Attribute value.
 	Attr() Attribute
+
+	// Adapter returns the type adapter to be used for adapting resolved Attribute values.
 	Adapter() ref.TypeAdapter
+
+	// AddQualifier proxies the Attribute.AddQualifier method.
 	AddQualifier(Qualifier) (instAttr, error)
 }
 
@@ -747,18 +758,22 @@ type evalAttr struct {
 	attr    Attribute
 }
 
+// ID of the attribute instruction.
 func (a *evalAttr) ID() int64 {
 	return a.attr.ID()
 }
 
+// Attr implements the instAttr interface method.
 func (a *evalAttr) Attr() Attribute {
 	return a.attr
 }
 
+// Adapter implements the instAttr interface method.
 func (a *evalAttr) Adapter() ref.TypeAdapter {
 	return a.adapter
 }
 
+// Eval implements the Interpretable interface method.
 func (a *evalAttr) Eval(ctx Activation) ref.Val {
 	v, err := a.attr.Resolve(ctx)
 	if err != nil {
@@ -767,6 +782,7 @@ func (a *evalAttr) Eval(ctx Activation) ref.Val {
 	return a.adapter.NativeToValue(v)
 }
 
+// AddQualifier implements the instAttr interface method.
 func (a *evalAttr) AddQualifier(qual Qualifier) (instAttr, error) {
 	_, err := a.attr.AddQualifier(qual)
 	return a, err

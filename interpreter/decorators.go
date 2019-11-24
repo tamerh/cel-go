@@ -33,6 +33,7 @@ func decObserveEval(observer evalObserver) InterpretableDecorator {
 	return func(i Interpretable) (Interpretable, error) {
 		switch inst := i.(type) {
 		case *evalWatch, *evalWatchAttr, *evalWatchConst:
+			// these instruction are already watching, return straight-away.
 			return i, nil
 		case instAttr:
 			return &evalWatchAttr{
