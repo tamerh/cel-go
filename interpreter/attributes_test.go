@@ -19,6 +19,10 @@ import (
 
 	"github.com/google/cel-go/common/packages"
 	"github.com/google/cel-go/common/types"
+
+	proto3pb "github.com/google/cel-go/test/proto3pb"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 func TestAttributes_AbsoluteAttr(t *testing.T) {
@@ -337,4 +341,80 @@ func TestAttributes_ConditionalAttr_ErrorUnknown(t *testing.T) {
 	if !ok || !types.IsUnknown(unk) {
 		t.Errorf("Got %v, wanted unknown", out)
 	}
+}
+
+func TestResolver_CustomQualifier(t *testing.T) {
+	reg := types.NewRegistry()
+	res := &custResolver{
+		Resolver: NewResolver(packages.DefaultPackage, reg, reg),
+	}
+	msg := &proto3pb.TestAllTypes_NestedMessage{
+		Bb: 123,
+	}
+	vars, _ := NewActivation(map[string]interface{}{
+		"msg": msg,
+	})
+	attr := res.AbsoluteAttribute(1, "msg")
+	qualBB, _ := res.NewQualifier(&exprpb.Type{
+		TypeKind: &exprpb.Type_MessageType{
+			MessageType: "google.expr.proto3.test.TestAllTypes.NestedMessage",
+		},
+	}, 2, "bb")
+	attr.AddQualifier(qualBB)
+	out, err := attr.Resolve(vars)
+	if err != nil {
+		t.Error(err)
+	}
+	if out != int32(123) {
+		t.Errorf("Got %v, wanted 123", out)
+	}
+}
+
+func BenchmarkResolver_CustomQualifier(b *testing.B) {
+	reg := types.NewRegistry()
+	res := &custResolver{
+		Resolver: NewResolver(packages.DefaultPackage, reg, reg),
+	}
+	msg := &proto3pb.TestAllTypes_NestedMessage{
+		Bb: 123,
+	}
+	vars, _ := NewActivation(map[string]interface{}{
+		"msg": msg,
+	})
+	attr := res.AbsoluteAttribute(1, "msg")
+	qualBB, _ := res.NewQualifier(&exprpb.Type{
+		TypeKind: &exprpb.Type_MessageType{
+			MessageType: "google.expr.proto3.test.TestAllTypes.NestedMessage",
+		},
+	}, 2, "bb")
+	attr.AddQualifier(qualBB)
+	for i := 0; i < b.N; i++ {
+		attr.Resolve(vars)
+	}
+}
+
+type custResolver struct {
+	Resolver
+}
+
+func (r *custResolver) NewQualifier(objType *exprpb.Type,
+	qualID int64, val interface{}) (Qualifier, error) {
+	if objType.GetMessageType() == "google.expr.proto3.test.TestAllTypes.NestedMessage" {
+		return &nestedMsgQualifier{id: qualID, field: val.(string)}, nil
+	}
+	return r.Resolver.NewQualifier(objType, qualID, val)
+}
+
+type nestedMsgQualifier struct {
+	id    int64
+	field string
+}
+
+func (q *nestedMsgQualifier) ID() int64 {
+	return q.id
+}
+
+func (q *nestedMsgQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+	pb := obj.(*proto3pb.TestAllTypes_NestedMessage)
+	return pb.GetBb(), nil
 }

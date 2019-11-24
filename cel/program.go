@@ -73,6 +73,7 @@ type prog struct {
 	dispatcher    interpreter.Dispatcher
 	interpreter   interpreter.Interpreter
 	interpretable interpreter.Interpretable
+	resolver      interpreter.Resolver
 }
 
 // progFactory is a helper alias for marking a program creation factory function.
@@ -90,11 +91,13 @@ type progGen struct {
 func newProgram(e *env, ast Ast, opts ...ProgramOption) (Program, error) {
 	// Build the dispatcher, interpreter, and default program value.
 	disp := interpreter.NewDispatcher()
-	interp := interpreter.NewInterpreter(disp, e.pkg, e.provider, e.adapter, e.resolver)
+
+	// Ensure the default resolver is set after the adapter and provider are configured.
+	resolver := interpreter.NewResolver(e.pkg, e.adapter, e.provider)
 	p := &prog{
-		env:         e,
-		dispatcher:  disp,
-		interpreter: interp}
+		env:        e,
+		dispatcher: disp,
+		resolver:   resolver}
 
 	// Configure the program via the ProgramOption values.
 	var err error
@@ -107,6 +110,9 @@ func newProgram(e *env, ast Ast, opts ...ProgramOption) (Program, error) {
 			return nil, err
 		}
 	}
+
+	interp := interpreter.NewInterpreter(disp, e.pkg, e.provider, e.adapter, p.resolver)
+	p.interpreter = interp
 
 	// Translate the EvalOption flags into InterpretableDecorator instances.
 	decorators := []interpreter.InterpretableDecorator{}

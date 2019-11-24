@@ -49,6 +49,7 @@ type testCase struct {
 	env       []*exprpb.Decl
 	types     []proto.Message
 	funcs     []*functions.Overload
+	res       Resolver
 	unchecked bool
 
 	in  map[string]interface{}
@@ -605,7 +606,7 @@ var (
 			},
 		},
 		{
-			name:  "select_pb3_single_compare",
+			name:  "select_pb3_compare",
 			expr:  `a.single_uint64 > 3u`,
 			pkg:   "google.expr.proto3.test",
 			types: []proto.Message{&proto3pb.TestAllTypes{}},
@@ -615,6 +616,29 @@ var (
 			in: map[string]interface{}{
 				"a": &proto3pb.TestAllTypes{
 					SingleUint64: 10,
+				},
+			},
+			out: types.True,
+		},
+		{
+			name:  "select_custom_pb3_compare",
+			expr:  `a.bb > 100`,
+			pkg:   "google.expr.proto3.test",
+			types: []proto.Message{&proto3pb.TestAllTypes_NestedMessage{}},
+			env: []*exprpb.Decl{
+				decls.NewIdent("a",
+					decls.NewObjectType("google.expr.proto3.test.TestAllTypes.NestedMessage"), nil),
+			},
+			res: &custResolver{
+				Resolver: NewResolver(
+					packages.NewPackage("google.expr.proto3.test"),
+					types.NewRegistry(),
+					types.NewRegistry(),
+				),
+			},
+			in: map[string]interface{}{
+				"a": &proto3pb.TestAllTypes_NestedMessage{
+					Bb: 101,
 				},
 			},
 			out: types.True,
@@ -946,6 +970,9 @@ func program(tst *testCase, opts ...InterpretableDecorator) (Interpretable, Acti
 		reg = types.NewRegistry(tst.types...)
 	}
 	res := NewResolver(pkg, reg, reg)
+	if tst.res != nil {
+		res = tst.res
+	}
 
 	// Configure the environment.
 	env := checker.NewStandardEnv(pkg, reg)

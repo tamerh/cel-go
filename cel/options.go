@@ -221,6 +221,14 @@ func Globals(vars interface{}) ProgramOption {
 	}
 }
 
+// CustomResolver adjusts the variable and field resolution behavior of the Program.
+func CustomResolver(resolver interpreter.Resolver) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.resolver = resolver
+		return p, nil
+	}
+}
+
 // EvalOption indicates an evaluation option that may affect the evaluation behavior or information
 // in the output result.
 type EvalOption int
