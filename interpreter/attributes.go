@@ -707,6 +707,8 @@ func (q *boolQualifier) Qualify(vars Activation, obj interface{}) (interface{}, 
 	switch o := obj.(type) {
 	case map[bool]interface{}:
 		obj, isKey = o[b]
+	case map[bool]bool:
+		obj, isKey = o[b]
 	case map[bool]string:
 		obj, isKey = o[b]
 	case map[bool]int:

@@ -498,6 +498,56 @@ var (
 			},
 		},
 		{
+			name: "select_bool_key",
+			expr: `m.boolStr[true] == 'string'
+				&& m.boolFloat32[true] == 1.5
+				&& m.boolFloat64[false] == -2.1
+				&& m.boolInt[false] == -3
+				&& m.boolInt32[false] == 0
+				&& m.boolInt64[true] == 4
+				&& m.boolUint[true] == 5u
+				&& m.boolUint32[true] == 6u
+				&& m.boolUint64[false] == 7u
+				&& m.boolBool[true]
+				&& m.boolIface[false] == true`,
+			env: []*exprpb.Decl{
+				decls.NewIdent("m", decls.NewMapType(decls.String, decls.Dyn), nil),
+			},
+			in: map[string]interface{}{
+				"m": map[string]interface{}{
+					"boolStr":     map[bool]string{true: "string"},
+					"boolFloat32": map[bool]float32{true: 1.5},
+					"boolFloat64": map[bool]float64{false: -2.1},
+					"boolInt":     map[bool]int{false: -3},
+					"boolInt32":   map[bool]int32{false: 0},
+					"boolInt64":   map[bool]int64{true: 4},
+					"boolUint":    map[bool]uint{true: 5},
+					"boolUint32":  map[bool]uint32{true: 6},
+					"boolUint64":  map[bool]uint64{false: 7},
+					"boolBool":    map[bool]bool{true: true},
+					"boolIface":   map[bool]interface{}{false: true},
+				},
+			},
+		},
+		{
+			name: "select_uint_key",
+			expr: `m.uintIface[1u] == 'string'
+				&& m.uint32Iface[2u] == 1.5
+				&& m.uint64Iface[3u] == -2.1
+				&& m.uint64String[4u] == 'three'`,
+			env: []*exprpb.Decl{
+				decls.NewIdent("m", decls.NewMapType(decls.String, decls.Dyn), nil),
+			},
+			in: map[string]interface{}{
+				"m": map[string]interface{}{
+					"uintIface":    map[uint]interface{}{1: "string"},
+					"uint32Iface":  map[uint32]interface{}{2: 1.5},
+					"uint64Iface":  map[uint64]interface{}{3: -2.1},
+					"uint64String": map[uint64]string{4: "three"},
+				},
+			},
+		},
+		{
 			name: "select_index",
 			expr: `m.strList[0] == 'string'
 				&& m.floatList[0] == 1.5
