@@ -70,15 +70,6 @@ func decDisableShortcircuits() InterpretableDecorator {
 				lhs: expr.lhs,
 				rhs: expr.rhs,
 			}, nil
-		case instAttr:
-			cond, isCond := expr.Attr().(*conditionalAttribute)
-			if isCond {
-				return &evalExhaustiveConditional{
-					id:      cond.id,
-					attr:    cond,
-					adapter: expr.Adapter(),
-				}, nil
-			}
 		case *evalFold:
 			return &evalExhaustiveFold{
 				id:        expr.id,
@@ -90,6 +81,15 @@ func decDisableShortcircuits() InterpretableDecorator {
 				step:      expr.step,
 				result:    expr.result,
 			}, nil
+		case instAttr:
+			cond, isCond := expr.Attr().(*conditionalAttribute)
+			if isCond {
+				return &evalExhaustiveConditional{
+					id:      cond.id,
+					attr:    cond,
+					adapter: expr.Adapter(),
+				}, nil
+			}
 		}
 		return i, nil
 	}

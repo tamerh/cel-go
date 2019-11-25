@@ -109,7 +109,11 @@ func (td *TypeDescription) makeMetadata() *typeMetadata {
 		}
 		refVal := reflect.New(elemType)
 		meta.reflectedVal = &refVal
-		meta.emptyVal = refVal.Interface()
+		if refVal.CanInterface() {
+			meta.emptyVal = refVal.Interface()
+		} else {
+			meta.emptyVal = reflect.Zero(elemType).Interface()
+		}
 	}
 
 	fieldIndexMap := make(map[string]int)
@@ -282,8 +286,9 @@ func (fd *FieldDescription) IsSet(target interface{}) bool {
 	return isFieldSet(fieldVal)
 }
 
-// GetFrom returns the accessor method associated with the field
-// on the proto generated struct.
+// GetFrom returns the accessor method associated with the field on the proto generated struct.
+//
+// If the field is not set, the proto default value is returned instead.
 func (fd *FieldDescription) GetFrom(target interface{}) (interface{}, error) {
 	t, ok := target.(reflect.Value)
 	if !ok {

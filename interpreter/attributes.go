@@ -165,11 +165,19 @@ func (r *resolver) RelativeAttribute(id int64, operand Interpretable) Attribute 
 func (r *resolver) NewQualifier(objType *exprpb.Type,
 	qualID int64,
 	val interface{}) (Qualifier, error) {
+	// Before creating a new qualifier check to see if this is a protobuf message field access.
+	// If so, use the precomputed GetFrom qualification method ratehr than the standard
+	// stringQualifier.
 	str, isStr := val.(string)
 	if isStr && objType != nil && objType.GetMessageType() != "" {
 		ft, found := r.provider.FindFieldType(objType.GetMessageType(), str)
 		if found && ft.IsSet != nil && ft.GetFrom != nil {
-			return FieldQualifier(r.adapter, qualID, str, ft), nil
+			return &fieldQualifier{
+				id:        qualID,
+				Name:      str,
+				FieldType: ft,
+				adapter:   r.adapter,
+			}, nil
 		}
 	}
 	return newQualifier(r.adapter, qualID, val)
@@ -234,6 +242,10 @@ func (a *absoluteAttribute) Qualify(vars Activation, obj interface{}) (interface
 	if err != nil {
 		return nil, err
 	}
+	unk, isUnk := val.(types.Unknown)
+	if isUnk {
+		return fmtUnknown(unk, a), nil
+	}
 	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
 		return nil, err
@@ -282,7 +294,7 @@ func (a *conditionalAttribute) Resolve(vars Activation) (interface{}, error) {
 		return a.falsy.Resolve(vars)
 	}
 	if types.IsUnknown(val) {
-		return val, nil
+		return fmtUnknown(val, a), nil
 	}
 	return nil, types.ValOrErr(val, "no such overload").Value().(error)
 }
@@ -292,6 +304,10 @@ func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interf
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
+	}
+	unk, isUnk := val.(types.Unknown)
+	if isUnk {
+		return fmtUnknown(unk, a), nil
 	}
 	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
@@ -318,6 +334,7 @@ func (a *oneofAttribute) ID() int64 {
 func (a *oneofAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 	str, isStr := qual.(*stringQualifier)
 	var augmentedNames []string
+	// First add the qualifier to all existing attributes in the oneof.
 	for _, attr := range a.attrs {
 		if isStr && len(attr.qualifiers) == 0 {
 			augmentedNames = make([]string,
@@ -329,6 +346,7 @@ func (a *oneofAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 		}
 		attr.AddQualifier(qual)
 	}
+	// Next, ensure the most specific variable / type reference is searched first.
 	a.attrs = append([]*absoluteAttribute{
 		&absoluteAttribute{
 			id:             qual.ID(),
@@ -348,7 +366,8 @@ func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 	for _, attr := range a.attrs {
 		for _, nm := range attr.namespaceNames {
 			op, found := vars.ResolveName(nm)
-			_, isUnk := op.(types.Unknown)
+			unk, isUnk := op.(types.Unknown)
+			// If the variable was found and not unknown, then attempt to qualify the value.
 			if found && !isUnk {
 				var err error
 				for _, qual := range attr.qualifiers {
@@ -359,6 +378,7 @@ func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 				}
 				return op, nil
 			}
+			// Otherwise, attempt to find a type value.
 			typ, found := a.provider.FindIdent(nm)
 			if found {
 				if len(attr.qualifiers) == 0 {
@@ -366,8 +386,10 @@ func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 				}
 				return nil, fmt.Errorf("no such attribute: %v", typ)
 			}
+			// If the type was not found and the value is unknown ensure it is returned with a reference
+			// to the current value.
 			if isUnk {
-				return types.Unknown{a.ID()}, nil
+				return fmtUnknown(unk, a), nil
 			}
 		}
 	}
@@ -379,6 +401,10 @@ func (a *oneofAttribute) Qualify(vars Activation, obj interface{}) (interface{},
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
+	}
+	unk, isUnk := val.(types.Unknown)
+	if isUnk {
+		return fmtUnknown(unk, a), nil
 	}
 	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
@@ -408,13 +434,15 @@ func (a *relativeAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 
 // Resolve expression value and qualifier relative to the expression result.
 func (a *relativeAttribute) Resolve(vars Activation) (interface{}, error) {
+	// First, evaluate the operand.
 	v := a.operand.Eval(vars)
 	if types.IsError(v) {
 		return nil, v.Value().(error)
 	}
 	if types.IsUnknown(v) {
-		return v, nil
+		return fmtUnknown(v, a), nil
 	}
+	// Next, qualify it. Qualification handles unkonwns as well, so there's no need to recheck.
 	var err error
 	var obj interface{} = v
 	for _, qual := range a.qualifiers {
@@ -431,6 +459,10 @@ func (a *relativeAttribute) Qualify(vars Activation, obj interface{}) (interface
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
+	}
+	unk, isUnk := val.(types.Unknown)
+	if isUnk {
+		return fmtUnknown(unk, a), nil
 	}
 	qual, err := a.res.NewQualifier(nil, a.id, val)
 	if err != nil {
@@ -486,6 +518,7 @@ func (q *stringQualifier) ID() int64 {
 	return q.id
 }
 
+// Qualify implements the Qualifier interface method.
 func (q *stringQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	s := q.value
 	isMap := false
@@ -554,6 +587,7 @@ func (q *intQualifier) ID() int64 {
 	return q.id
 }
 
+// Qualify implements the Qualifier interface method.
 func (q *intQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	i := q.value
 	isMap := false
@@ -657,6 +691,7 @@ func (q *uintQualifier) ID() int64 {
 	return q.id
 }
 
+// Qualify implements the Qualifier interface method.
 func (q *uintQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	u := q.value
 	isMap := false
@@ -701,6 +736,7 @@ func (q *boolQualifier) ID() int64 {
 	return q.id
 }
 
+// Qualify implements the Qualifier interface method.
 func (q *boolQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	b := q.value
 	isKey := false
@@ -745,19 +781,9 @@ func (q *boolQualifier) Qualify(vars Activation, obj interface{}) (interface{}, 
 	return obj, nil
 }
 
-// FieldQualifier indicates that the qualification is a well-defined field with a known
+// fieldQualifier indicates that the qualification is a well-defined field with a known
 // field type. When the field type is known this can be used to improve the speed and
 // efficiency of field resolution.
-func FieldQualifier(adapter ref.TypeAdapter,
-	id int64, name string, fieldType *ref.FieldType) Qualifier {
-	return &fieldQualifier{
-		id:        id,
-		Name:      name,
-		FieldType: fieldType,
-		adapter:   adapter,
-	}
-}
-
 type fieldQualifier struct {
 	id        int64
 	Name      string
@@ -770,6 +796,7 @@ func (q *fieldQualifier) ID() int64 {
 	return q.id
 }
 
+// Qualify implements the Qualifier interface method.
 func (q *fieldQualifier) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	if rv, ok := obj.(ref.Val); ok {
 		obj = rv.Value()
@@ -781,6 +808,8 @@ func (q *fieldQualifier) Qualify(vars Activation, obj interface{}) (interface{},
 	return v, nil
 }
 
+// fmtUnknown ensure that unknown values are annotated with the qualifier id where they are
+// detected if an id is not already set.
 func fmtUnknown(elem ref.Val, qual Qualifier) ref.Val {
 	unk := elem.(types.Unknown)
 	if len(unk) == 0 {
@@ -789,6 +818,8 @@ func fmtUnknown(elem ref.Val, qual Qualifier) ref.Val {
 	return unk
 }
 
+// refResolve attempts to convert the value to a CEL value and then uses reflection methods
+// to try and resolve the qualifier.
 func refResolve(adapter ref.TypeAdapter, idx ref.Val, obj interface{}) (ref.Val, error) {
 	celVal := adapter.NativeToValue(obj)
 	mapper, isMapper := celVal.(traits.Mapper)

@@ -93,6 +93,7 @@ func newProgram(e *env, ast Ast, opts ...ProgramOption) (Program, error) {
 	disp := interpreter.NewDispatcher()
 
 	// Ensure the default resolver is set after the adapter and provider are configured.
+	// The resolver may be overriden by using the CustomResolver.
 	resolver := interpreter.NewResolver(e.pkg, e.adapter, e.provider)
 	p := &prog{
 		env:        e,

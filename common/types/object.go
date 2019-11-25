@@ -146,7 +146,3 @@ func (o *protoObj) Type() ref.Type {
 func (o *protoObj) Value() interface{} {
 	return o.value
 }
-
-var (
-	noArgs = []reflect.Value{}
-)
