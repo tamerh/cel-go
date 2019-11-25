@@ -31,7 +31,7 @@ import (
 // formatting may be lost in translation, notably:
 //
 // - All quoted literals are doubled quoted.
-// - Byte literals are represented as utf8-string rather than byte, octal, or unicode escapes.
+// - Byte literals are represented as octal escapes (same as Google SQL).
 // - Floating point values are converted to the small number of digits needed to represent the value.
 // - Spacing around punctuation marks may be lost.
 // - Parentheses will only be applied when they affect operator precedence.
@@ -256,7 +256,7 @@ func (un *unparser) visitConst(expr *exprpb.Expr) error {
 		// bytes constants are surrounded with b"<bytes>"
 		b := c.GetBytesValue()
 		un.str.WriteString(`b"`)
-		un.str.Write(b)
+		un.str.WriteString(bytesToOctets(b))
 		un.str.WriteString(`"`)
 	case *exprpb.Constant_DoubleValue:
 		// represent the float using the minimum required digits
@@ -472,4 +472,14 @@ func isBinaryOrTernaryOperator(expr *exprpb.Expr) bool {
 	}
 	_, isBinaryOp := operators.FindReverseBinaryOperator(expr.GetCallExpr().GetFunction())
 	return isBinaryOp || isSamePrecedence(operators.Conditional, expr)
+}
+
+// bytesToOctets converts byte sequences to a string using a three digit octal encoded value
+// per byte.
+func bytesToOctets(byteVal []byte) string {
+	var b strings.Builder
+	for _, c := range byteVal {
+		fmt.Fprintf(&b, "\\%03o", c)
+	}
+	return b.String()
 }

@@ -53,7 +53,7 @@ func TestUnparse_Identical(t *testing.T) {
 		"list_empty":          `[]`,
 		"list_one":            `[1]`,
 		"list_many":           `["hello, world", "goodbye, world", "sure, why not?"]`,
-		"lit_bytes":           `b"Ã¿"`,
+		"lit_bytes":           `b"\303\203\302\277"`,
 		"lit_double":          `-42.101`,
 		"lit_false":           `false`,
 		"lit_int":             `-405069`,
@@ -64,7 +64,7 @@ func TestUnparse_Identical(t *testing.T) {
 		"ident":               `my_ident`,
 		"macro_has":           `has(hello.world)`,
 		"map_empty":           `{}`,
-		"map_lit_key":         `{"a": a.b.c, b"b": bytes(a.b.c)}`,
+		"map_lit_key":         `{"a": a.b.c, b"\142": bytes(a.b.c)}`,
 		"map_expr_key":        `{a: a, b: a.b, c: a.b.c, a ? b : c: false, a || b: true}`,
 		"msg_empty":           `v1alpha1.Expr{}`,
 		"msg_fields":          `v1alpha1.Expr{id: 1, call_expr: v1alpha1.Call_Expr{function: "name"}}`,
@@ -119,8 +119,9 @@ func TestUnparse_Equivalent(t *testing.T) {
 		"call_index": {`a[  1  ]["b"]`, `a[  1]  ["b"]`},
 		"call_or_and": {`(false && !true) || false`,
 			` false && !true  || false`},
-		"call_not_not": {`!!true`, `  true`},
-		"select":       {`a . b . c`, `a .b  .c`},
+		"call_not_not":    {`!!true`, `  true`},
+		"lit_quote_bytes": {`b'aaa"bbb'`, `b"\141\141\141\042\142\142\142"`},
+		"select":          {`a . b . c`, `a .b  .c`},
 	}
 
 	for name, in := range tests {

@@ -175,6 +175,17 @@ func TestUnescapeBytesOctalMax(t *testing.T) {
 	}
 }
 
+func TestUnescapeBytesQuoting(t *testing.T) {
+	bs, err := unescape(`'''"Kim\t"'''`, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "\x22\x4b\x69\x6d\x09\x22"
+	if bs != want {
+		t.Errorf("Got '%v', wanted '%v'", bs, want)
+	}
+}
+
 func TestUnescapeBytesHex(t *testing.T) {
 	bs, err := unescape(`"\xc3\xbf"`, true)
 	if err != nil {

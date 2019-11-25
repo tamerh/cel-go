@@ -260,6 +260,28 @@ var (
 			},
 		},
 		{
+			name: "literal_equiv_string_bytes",
+			expr: `string(bytes("\303\277")) == '''\303\277'''`,
+		},
+		{
+			name: "literal_not_equiv_string_bytes",
+			expr: `string(b"\303\277") != '''\303\277'''`,
+		},
+		{
+			name: "literal_equiv_bytes_string",
+			expr: `string(b"\303\277") == 'ÿ'`,
+		},
+		{
+			name: "literal_bytes_string",
+			expr: `string(b'aaa"bbb')`,
+			out:  `aaa"bbb`,
+		},
+		{
+			name: "literal_bytes_string2",
+			expr: `string(b"""Kim\t""")`,
+			out: `Kim	`,
+		},
+		{
 			name:  "literal_pb3_msg",
 			pkg:   "google.api.expr",
 			types: []proto.Message{&exprpb.Expr{}},
