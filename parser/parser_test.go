@@ -1019,6 +1019,48 @@ ERROR: <input>:1:14: argument is not an identifier
  | [1, 2, 3].map(var, var * var)
  | .............^`,
 	},
+	{
+		I: "func{{a}}",
+		E: `ERROR: <input>:1:6: Syntax error: extraneous input '{' expecting {'}', IDENTIFIER}
+		| func{{a}}
+		| .....^
+	   ERROR: <input>:1:8: Syntax error: mismatched input '}' expecting ':'
+		| func{{a}}
+		| .......^
+	   ERROR: <input>:1:9: Syntax error: extraneous input '}' expecting <EOF>
+		| func{{a}}
+		| ........^`,
+	},
+	{
+		I: "msg{:a}",
+		E: `ERROR: <input>:1:5: Syntax error: extraneous input ':' expecting {'}', IDENTIFIER}
+		| msg{:a}
+		| ....^
+	   ERROR: <input>:1:7: Syntax error: mismatched input '}' expecting ':'
+		| msg{:a}
+		| ......^`,
+	},
+	{
+		I: "{a}",
+		E: `ERROR: <input>:1:3: Syntax error: mismatched input '}' expecting ':'
+		| {a}
+		| ..^`,
+	},
+	{
+		I: "{:a}",
+		E: `ERROR: <input>:1:2: Syntax error: extraneous input ':' expecting {'[', '{', '}', '(', '.', '-', '!', 'true', 'false', 'null', NUM_FLOAT, NUM_INT, NUM_UINT, STRING, BYTES, IDENTIFIER}
+		| {:a}
+		| .^
+	   ERROR: <input>:1:4: Syntax error: mismatched input '}' expecting ':'
+		| {:a}
+		| ...^`,
+	},
+	{
+		I: "ind[a{b}]",
+		E: `ERROR: <input>:1:8: Syntax error: mismatched input '}' expecting ':'
+		| ind[a{b}]
+		| .......^`,
+	},
 }
 
 type testInfo struct {
