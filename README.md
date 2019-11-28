@@ -206,37 +206,6 @@ Both the parsed and checked expressions contain source position information
 about each node that appears in the output AST. This information can be used
 to determine error locations at evaluation time as well.
 
-## Performance
-
-CEL evaluates very quickly. When the expression does not change frequently,
-or is easily cached, the evaluation speed is the more important factor when
-considering an expression language.
-
-The following expression was benchmarked between CEL and two other popular
-Go expression language libraries, namely https://github.com/antonmedv/expr
-and https://github.com/Knetic/govaluate:
-
-```javascript
-name.startsWith("/groups/" + group)  // CEL
-startsWith(name, concat("/groups/", group)) // Govaluate
-StartsWith(name, Concat("/groups/", group)) // Expr
-```
-
-The syntax varies slightly between the examples based on the features and
-limitations of the various libraries. It is important to keep in mind that
-the test setup and motivation for using one library over another is based
-on a number of factors, and that benchmarks aren't necessarily indicative
-of production behavior. Thus, the following results are purely illustrative
-of CEL's evaluation speed.
-
-```
-BenchmarkCEL-8           3000000               357 ns/op
-BenchmarkGovaluate-8     3000000               572 ns/op
-BenchmarkExpr-8          1000000              1402 ns/op
-```
-
-Benchmark setup forthcoming in an upcoming wiki.
-
 ## Install
 
 CEL-Go supports `modules` and uses semantic versioning. For more info
