@@ -29,6 +29,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	test2pb "github.com/google/cel-spec/proto/test/v1/proto2/test_all_types"
+	test3pb "github.com/google/cel-spec/proto/test/v1/proto3/test_all_types"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	rpc "google.golang.org/genproto/googleapis/rpc/status"
 )
@@ -77,6 +79,8 @@ func (s *ConformanceServer) Check(ctx context.Context, in *exprpb.CheckRequest) 
 	}
 	checkOptions = append(checkOptions, cel.Container(in.Container))
 	checkOptions = append(checkOptions, cel.Declarations(in.TypeEnv...))
+	checkOptions = append(checkOptions, cel.Types(&test2pb.TestAllTypes{}))
+	checkOptions = append(checkOptions, cel.Types(&test3pb.TestAllTypes{}))
 	env, _ := cel.NewEnv(checkOptions...)
 
 	// Check the expression.
@@ -94,7 +98,8 @@ func (s *ConformanceServer) Check(ctx context.Context, in *exprpb.CheckRequest) 
 
 // Eval implements ConformanceService.Eval.
 func (s *ConformanceServer) Eval(ctx context.Context, in *exprpb.EvalRequest) (*exprpb.EvalResponse, error) {
-	env, _ := cel.NewEnv(cel.Container(in.Container))
+	env, _ := cel.NewEnv(cel.Container(in.Container),
+		cel.Types(&test2pb.TestAllTypes{}, &test3pb.TestAllTypes{}))
 	var prg cel.Program
 	var err error
 	switch in.ExprKind.(type) {
