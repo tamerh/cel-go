@@ -120,8 +120,8 @@ func TestPrune(t *testing.T) {
 		pExpr := &exprpb.ParsedExpr{Expr: tst.E}
 		state := NewEvalState()
 		reg := types.NewRegistry()
-		res := NewResolver(packages.DefaultPackage, reg, reg)
-		interp := NewStandardInterpreter(packages.DefaultPackage, reg, reg, res)
+		attrs := NewAttributeFactory(packages.DefaultPackage, reg, reg)
+		interp := NewStandardInterpreter(packages.DefaultPackage, reg, reg, attrs)
 		interpretable, _ := interp.NewUncheckedInterpretable(
 			pExpr.Expr,
 			ExhaustiveEval(state))

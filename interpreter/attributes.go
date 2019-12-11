@@ -26,9 +26,8 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
-// Resolver provides methods for finding values by name and resolving qualified attributes from
-// them.
-type Resolver interface {
+// AttributeFactory provides methods creating Attribute and Qualifier values.
+type AttributeFactory interface {
 	// AbsoluteAttribute creates an attribute that refers to a top-level variable name.
 	//
 	// Only type-checked expressions generate absolute attributes.
@@ -82,20 +81,20 @@ type Attribute interface {
 	Resolve(Activation) (interface{}, error)
 }
 
-// NewResolver returns a default Resolver which is cabable of resolving types by simple names, and
-// can resolve qualifiers on CEL values using the supported qualifier types: bool, int, string,
-// and uint.
-func NewResolver(pkg packages.Packager,
+// NewAttributeFactory returns a default AttributeFactory which is produces Attribute values
+// capable of resolving types by simple names and qualify the values using the supported qualifier
+// types: bool, int, string, and uint.
+func NewAttributeFactory(pkg packages.Packager,
 	a ref.TypeAdapter,
-	p ref.TypeProvider) Resolver {
-	return &resolver{
+	p ref.TypeProvider) AttributeFactory {
+	return &attrFactory{
 		pkg:      pkg,
 		adapter:  a,
 		provider: p,
 	}
 }
 
-type resolver struct {
+type attrFactory struct {
 	pkg      packages.Packager
 	adapter  ref.TypeAdapter
 	provider ref.TypeProvider
@@ -105,7 +104,7 @@ type resolver struct {
 //
 // The namespaceNames represent the names the variable could have based on namespace
 // resolution rules.
-func (r *resolver) AbsoluteAttribute(id int64, name string) Attribute {
+func (r *attrFactory) AbsoluteAttribute(id int64, name string) Attribute {
 	return &absoluteAttribute{
 		id:             id,
 		namespaceNames: []string{name},
@@ -118,7 +117,7 @@ func (r *resolver) AbsoluteAttribute(id int64, name string) Attribute {
 
 // ConditionalAttribute supports the case where an attribute selection may occur on a conditional
 // expression, e.g. (cond ? a : b).c
-func (r *resolver) ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute {
+func (r *attrFactory) ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute {
 	return &conditionalAttribute{
 		id:      id,
 		expr:    expr,
@@ -131,7 +130,7 @@ func (r *resolver) ConditionalAttribute(id int64, expr Interpretable, t, f Attri
 
 // OneofAttribute collects variants of unchecked AbsoluteAttribute values which could either be
 // direct variable accesses or some combination of variable access with qualification.
-func (r *resolver) OneofAttribute(id int64, name string) Attribute {
+func (r *attrFactory) OneofAttribute(id int64, name string) Attribute {
 	return &oneofAttribute{
 		id: id,
 		attrs: []*absoluteAttribute{
@@ -151,7 +150,7 @@ func (r *resolver) OneofAttribute(id int64, name string) Attribute {
 }
 
 // RelativeAttribute refers to an expression and an optional qualifier path.
-func (r *resolver) RelativeAttribute(id int64, operand Interpretable) Attribute {
+func (r *attrFactory) RelativeAttribute(id int64, operand Interpretable) Attribute {
 	return &relativeAttribute{
 		id:         id,
 		operand:    operand,
@@ -161,8 +160,8 @@ func (r *resolver) RelativeAttribute(id int64, operand Interpretable) Attribute 
 	}
 }
 
-// NewQualifier is an implementation of the Resolver interface.
-func (r *resolver) NewQualifier(objType *exprpb.Type,
+// NewQualifier is an implementation of the AttributeFactory interface.
+func (r *attrFactory) NewQualifier(objType *exprpb.Type,
 	qualID int64,
 	val interface{}) (Qualifier, error) {
 	// Before creating a new qualifier check to see if this is a protobuf message field access.
@@ -189,7 +188,7 @@ type absoluteAttribute struct {
 	qualifiers     []Qualifier
 	adapter        ref.TypeAdapter
 	provider       ref.TypeProvider
-	res            Resolver
+	res            AttributeFactory
 }
 
 // ID implements the Attribute interface method.
@@ -236,7 +235,7 @@ func (a *absoluteAttribute) Resolve(vars Activation) (interface{}, error) {
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
-// Qualify is an implementation of the Resolver interface method.
+// Qualify is an implementation of the AttributeFactory interface method.
 func (a *absoluteAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
@@ -259,7 +258,7 @@ type conditionalAttribute struct {
 	truthy  Attribute
 	falsy   Attribute
 	adapter ref.TypeAdapter
-	res     Resolver
+	res     AttributeFactory
 }
 
 // ID is an implementation of the Attribute interface method.
@@ -299,7 +298,7 @@ func (a *conditionalAttribute) Resolve(vars Activation) (interface{}, error) {
 	return nil, types.ValOrErr(val, "no such overload").Value().(error)
 }
 
-// Qualify is an implementation of the Resolver interface method.
+// Qualify is an implementation of the AttributeFactory interface method.
 func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
@@ -321,7 +320,7 @@ type oneofAttribute struct {
 	attrs    []*absoluteAttribute
 	adapter  ref.TypeAdapter
 	provider ref.TypeProvider
-	res      Resolver
+	res      AttributeFactory
 }
 
 // ID is an implementation of the Attribute interface method.
@@ -396,7 +395,7 @@ func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
-// Qualify is an implementation of the Resolver interface method.
+// Qualify is an implementation of the AttributeFactory interface method.
 func (a *oneofAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
@@ -418,7 +417,7 @@ type relativeAttribute struct {
 	operand    Interpretable
 	qualifiers []Qualifier
 	adapter    ref.TypeAdapter
-	res        Resolver
+	res        AttributeFactory
 }
 
 // ID is an implementation of the Attribute interface method.
@@ -454,7 +453,7 @@ func (a *relativeAttribute) Resolve(vars Activation) (interface{}, error) {
 	return obj, nil
 }
 
-// Qualify is an implementation of the Resolver interface method.
+// Qualify is an implementation of the AttributeFactory interface method.
 func (a *relativeAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {

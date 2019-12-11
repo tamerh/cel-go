@@ -39,19 +39,19 @@ type interpretablePlanner interface {
 func newPlanner(disp Dispatcher,
 	provider ref.TypeProvider,
 	adapter ref.TypeAdapter,
-	resolver Resolver,
+	attrFactory AttributeFactory,
 	pkg packages.Packager,
 	checked *exprpb.CheckedExpr,
 	decorators ...InterpretableDecorator) interpretablePlanner {
 	return &planner{
-		disp:       disp,
-		provider:   provider,
-		adapter:    adapter,
-		resolver:   resolver,
-		pkg:        pkg,
-		refMap:     checked.GetReferenceMap(),
-		typeMap:    checked.GetTypeMap(),
-		decorators: decorators,
+		disp:        disp,
+		provider:    provider,
+		adapter:     adapter,
+		attrFactory: attrFactory,
+		pkg:         pkg,
+		refMap:      checked.GetReferenceMap(),
+		typeMap:     checked.GetTypeMap(),
+		decorators:  decorators,
 	}
 }
 
@@ -61,31 +61,31 @@ func newPlanner(disp Dispatcher,
 func newUncheckedPlanner(disp Dispatcher,
 	provider ref.TypeProvider,
 	adapter ref.TypeAdapter,
-	resolver Resolver,
+	attrFactory AttributeFactory,
 	pkg packages.Packager,
 	decorators ...InterpretableDecorator) interpretablePlanner {
 	return &planner{
-		disp:       disp,
-		provider:   provider,
-		adapter:    adapter,
-		resolver:   resolver,
-		pkg:        pkg,
-		refMap:     make(map[int64]*exprpb.Reference),
-		typeMap:    make(map[int64]*exprpb.Type),
-		decorators: decorators,
+		disp:        disp,
+		provider:    provider,
+		adapter:     adapter,
+		attrFactory: attrFactory,
+		pkg:         pkg,
+		refMap:      make(map[int64]*exprpb.Reference),
+		typeMap:     make(map[int64]*exprpb.Type),
+		decorators:  decorators,
 	}
 }
 
 // planner is an implementatio of the interpretablePlanner interface.
 type planner struct {
-	disp       Dispatcher
-	provider   ref.TypeProvider
-	adapter    ref.TypeAdapter
-	resolver   Resolver
-	pkg        packages.Packager
-	refMap     map[int64]*exprpb.Reference
-	typeMap    map[int64]*exprpb.Type
-	decorators []InterpretableDecorator
+	disp        Dispatcher
+	provider    ref.TypeProvider
+	adapter     ref.TypeAdapter
+	attrFactory AttributeFactory
+	pkg         packages.Packager
+	refMap      map[int64]*exprpb.Reference
+	typeMap     map[int64]*exprpb.Type
+	decorators  []InterpretableDecorator
 }
 
 // Plan implements the interpretablePlanner interface. This implementation of the Plan method also
@@ -139,7 +139,7 @@ func (p *planner) planIdent(expr *exprpb.Expr) (Interpretable, error) {
 	ident := expr.GetIdentExpr()
 	return &evalAttr{
 		adapter: p.adapter,
-		attr:    p.resolver.OneofAttribute(expr.Id, ident.Name),
+		attr:    p.attrFactory.OneofAttribute(expr.Id, ident.Name),
 	}, nil
 }
 
@@ -169,7 +169,7 @@ func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interp
 	// Otherwise, return the attribute for the resolved identifier name.
 	return &evalAttr{
 		adapter: p.adapter,
-		attr:    p.resolver.AbsoluteAttribute(id, identRef.Name),
+		attr:    p.attrFactory.AbsoluteAttribute(id, identRef.Name),
 	}, nil
 }
 
@@ -222,7 +222,7 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 		}, nil
 	}
 	// Build a qualifier.
-	qual, err := p.resolver.NewQualifier(
+	qual, err := p.attrFactory.NewQualifier(
 		opType, expr.Id, sel.Field)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,7 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 		return attr.AddQualifier(qual)
 	}
 
-	relAttr := p.resolver.RelativeAttribute(op.ID(), op)
+	relAttr := p.attrFactory.RelativeAttribute(op.ID(), op)
 	_, err = relAttr.AddQualifier(qual)
 	if err != nil {
 		return nil, err
@@ -456,7 +456,7 @@ func (p *planner) planCallConditional(expr *exprpb.Expr,
 	if isTruthyAttr {
 		tAttr = truthyAttr.Attr()
 	} else {
-		tAttr = p.resolver.RelativeAttribute(t.ID(), t)
+		tAttr = p.attrFactory.RelativeAttribute(t.ID(), t)
 	}
 
 	f := args[2]
@@ -465,12 +465,12 @@ func (p *planner) planCallConditional(expr *exprpb.Expr,
 	if isFalsyAttr {
 		fAttr = falsyAttr.Attr()
 	} else {
-		fAttr = p.resolver.RelativeAttribute(f.ID(), f)
+		fAttr = p.attrFactory.RelativeAttribute(f.ID(), f)
 	}
 
 	return &evalAttr{
 		adapter: p.adapter,
-		attr:    p.resolver.ConditionalAttribute(expr.Id, cond, tAttr, fAttr),
+		attr:    p.attrFactory.ConditionalAttribute(expr.Id, cond, tAttr, fAttr),
 	}, nil
 }
 
@@ -484,13 +484,13 @@ func (p *planner) planCallIndex(expr *exprpb.Expr,
 	if !isOpAttr {
 		opAttr = &evalAttr{
 			adapter: p.adapter,
-			attr:    p.resolver.RelativeAttribute(expr.Id, op),
+			attr:    p.attrFactory.RelativeAttribute(expr.Id, op),
 		}
 	}
 	indConst, isIndConst := ind.(instConst)
 	if isIndConst {
 		opType := p.typeMap[op.ID()]
-		qual, err := p.resolver.NewQualifier(
+		qual, err := p.attrFactory.NewQualifier(
 			opType, indConst.ID(), indConst.Value())
 		if err != nil {
 			return nil, err

@@ -28,7 +28,7 @@ import (
 func TestAttributes_AbsoluteAttr(t *testing.T) {
 	reg := types.NewRegistry()
 	pkg := packages.NewPackage("acme.ns")
-	res := NewResolver(pkg, reg, reg)
+	attrs := NewAttributeFactory(pkg, reg, reg)
 	vars, _ := NewActivation(map[string]interface{}{
 		"acme.a": map[string]interface{}{
 			"b": map[uint]interface{}{
@@ -40,10 +40,10 @@ func TestAttributes_AbsoluteAttr(t *testing.T) {
 	})
 
 	// acme.a.b[4][false]
-	attr := res.AbsoluteAttribute(1, "acme.a")
-	qualB, _ := res.NewQualifier(nil, 2, "b")
-	qual4, _ := res.NewQualifier(nil, 3, uint64(4))
-	qualFalse, _ := res.NewQualifier(nil, 4, false)
+	attr := attrs.AbsoluteAttribute(1, "acme.a")
+	qualB, _ := attrs.NewQualifier(nil, 2, "b")
+	qual4, _ := attrs.NewQualifier(nil, 3, uint64(4))
+	qualFalse, _ := attrs.NewQualifier(nil, 4, false)
 	attr.AddQualifier(qualB)
 	attr.AddQualifier(qual4)
 	attr.AddQualifier(qualFalse)
@@ -58,10 +58,10 @@ func TestAttributes_AbsoluteAttr(t *testing.T) {
 
 func TestAttributes_AbsoluteAttr_Type(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attrs := NewAttributeFactory(packages.DefaultPackage, reg, reg)
 
 	// int
-	attr := res.AbsoluteAttribute(1, "int")
+	attr := attrs.AbsoluteAttribute(1, "int")
 	out, err := attr.Resolve(EmptyActivation())
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestAttributes_AbsoluteAttr_Type(t *testing.T) {
 
 func TestAttributes_RelativeAttr(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attrs := NewAttributeFactory(packages.DefaultPackage, reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -87,12 +87,12 @@ func TestAttributes_RelativeAttr(t *testing.T) {
 		id:  1,
 		val: reg.NativeToValue(data),
 	}
-	attr := res.RelativeAttribute(1, op)
-	qualA, _ := res.NewQualifier(nil, 2, "a")
-	qualNeg1, _ := res.NewQualifier(nil, 3, int64(-1))
+	attr := attrs.RelativeAttribute(1, op)
+	qualA, _ := attrs.NewQualifier(nil, 2, "a")
+	qualNeg1, _ := attrs.NewQualifier(nil, 3, int64(-1))
 	attr.AddQualifier(qualA)
 	attr.AddQualifier(qualNeg1)
-	attr.AddQualifier(res.AbsoluteAttribute(4, "b"))
+	attr.AddQualifier(attrs.AbsoluteAttribute(4, "b"))
 	out, err := attr.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func TestAttributes_RelativeAttr(t *testing.T) {
 func TestAttributes_RelativeAttr_OneOf(t *testing.T) {
 	reg := types.NewRegistry()
 	pkg := packages.NewPackage("acme.ns")
-	res := NewResolver(pkg, reg, reg)
+	attrs := NewAttributeFactory(pkg, reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -119,12 +119,12 @@ func TestAttributes_RelativeAttr_OneOf(t *testing.T) {
 		id:  1,
 		val: reg.NativeToValue(data),
 	}
-	attr := res.RelativeAttribute(1, op)
-	qualA, _ := res.NewQualifier(nil, 2, "a")
-	qualNeg1, _ := res.NewQualifier(nil, 3, int64(-1))
+	attr := attrs.RelativeAttribute(1, op)
+	qualA, _ := attrs.NewQualifier(nil, 2, "a")
+	qualNeg1, _ := attrs.NewQualifier(nil, 3, int64(-1))
 	attr.AddQualifier(qualA)
 	attr.AddQualifier(qualNeg1)
-	attr.AddQualifier(res.OneofAttribute(4, "b"))
+	attr.AddQualifier(attrs.OneofAttribute(4, "b"))
 	out, err := attr.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
@@ -136,7 +136,7 @@ func TestAttributes_RelativeAttr_OneOf(t *testing.T) {
 
 func TestAttributes_RelativeAttr_Conditional(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attrs := NewAttributeFactory(packages.DefaultPackage, reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -151,19 +151,19 @@ func TestAttributes_RelativeAttr_Conditional(t *testing.T) {
 		id:  2,
 		val: types.False,
 	}
-	condAttr := res.ConditionalAttribute(4, cond,
-		res.AbsoluteAttribute(5, "b"),
-		res.AbsoluteAttribute(6, "c"))
-	qual0, _ := res.NewQualifier(nil, 7, 0)
+	condAttr := attrs.ConditionalAttribute(4, cond,
+		attrs.AbsoluteAttribute(5, "b"),
+		attrs.AbsoluteAttribute(6, "c"))
+	qual0, _ := attrs.NewQualifier(nil, 7, 0)
 	condAttr.AddQualifier(qual0)
 
 	obj := &evalConst{
 		id:  1,
 		val: reg.NativeToValue(data),
 	}
-	attr := res.RelativeAttribute(1, obj)
-	qualA, _ := res.NewQualifier(nil, 2, "a")
-	qualNeg1, _ := res.NewQualifier(nil, 3, int64(-1))
+	attr := attrs.RelativeAttribute(1, obj)
+	qualA, _ := attrs.NewQualifier(nil, 2, "a")
+	qualNeg1, _ := attrs.NewQualifier(nil, 3, int64(-1))
 	attr.AddQualifier(qualA)
 	attr.AddQualifier(qualNeg1)
 	attr.AddQualifier(condAttr)
@@ -179,7 +179,7 @@ func TestAttributes_RelativeAttr_Conditional(t *testing.T) {
 func TestAttributes_RelativeAttr_Relative(t *testing.T) {
 	pkg := packages.NewPackage("acme.ns")
 	reg := types.NewRegistry()
-	res := NewResolver(pkg, reg, reg)
+	attrs := NewAttributeFactory(pkg, reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: map[string]interface{}{
@@ -205,12 +205,12 @@ func TestAttributes_RelativeAttr_Relative(t *testing.T) {
 			3: "third",
 		}),
 	}
-	relAttr := res.RelativeAttribute(4, mp)
-	qualB, _ := res.NewQualifier(nil, 5, res.AbsoluteAttribute(5, "b"))
+	relAttr := attrs.RelativeAttribute(4, mp)
+	qualB, _ := attrs.NewQualifier(nil, 5, attrs.AbsoluteAttribute(5, "b"))
 	relAttr.AddQualifier(qualB)
-	attr := res.RelativeAttribute(1, obj)
-	qualA, _ := res.NewQualifier(nil, 2, "a")
-	qualNeg1, _ := res.NewQualifier(nil, 3, int64(-1))
+	attr := attrs.RelativeAttribute(1, obj)
+	qualA, _ := attrs.NewQualifier(nil, 2, "a")
+	qualNeg1, _ := attrs.NewQualifier(nil, 3, int64(-1))
 	attr.AddQualifier(qualA)
 	attr.AddQualifier(qualNeg1)
 	attr.AddQualifier(relAttr)
@@ -227,7 +227,7 @@ func TestAttributes_RelativeAttr_Relative(t *testing.T) {
 func TestAttributes_OneofAttr(t *testing.T) {
 	reg := types.NewRegistry()
 	pkg := packages.NewPackage("acme.ns")
-	res := NewResolver(pkg, reg, reg)
+	attrs := NewAttributeFactory(pkg, reg, reg)
 	data := map[string]interface{}{
 		"a": map[string]interface{}{
 			"b": []int32{2, 42},
@@ -238,8 +238,8 @@ func TestAttributes_OneofAttr(t *testing.T) {
 	vars, _ := NewActivation(data)
 
 	// a.b -> should resolve to acme.ns.a.b per namespace resolution rules.
-	attr := res.OneofAttribute(1, "a")
-	qualB, _ := res.NewQualifier(nil, 2, "b")
+	attr := attrs.OneofAttribute(1, "a")
+	qualB, _ := attrs.NewQualifier(nil, 2, "b")
 	attr.AddQualifier(qualB)
 	out, err := attr.Resolve(vars)
 	if err != nil {
@@ -252,7 +252,7 @@ func TestAttributes_OneofAttr(t *testing.T) {
 
 func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attrs := NewAttributeFactory(packages.DefaultPackage, reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -266,13 +266,13 @@ func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 	vars, _ := NewActivation(data)
 
 	// (true ? a : b.c)[-1][1]
-	tv := res.AbsoluteAttribute(2, "a")
-	fv := res.OneofAttribute(3, "b")
-	qualC, _ := res.NewQualifier(nil, 4, "c")
+	tv := attrs.AbsoluteAttribute(2, "a")
+	fv := attrs.OneofAttribute(3, "b")
+	qualC, _ := attrs.NewQualifier(nil, 4, "c")
 	fv.AddQualifier(qualC)
-	cond := res.ConditionalAttribute(1, &evalConst{val: types.True}, tv, fv)
-	qualNeg1, _ := res.NewQualifier(nil, 5, int64(-1))
-	qual1, _ := res.NewQualifier(nil, 6, int64(1))
+	cond := attrs.ConditionalAttribute(1, &evalConst{val: types.True}, tv, fv)
+	qualNeg1, _ := attrs.NewQualifier(nil, 5, int64(-1))
+	qual1, _ := attrs.NewQualifier(nil, 6, int64(1))
 	cond.AddQualifier(qualNeg1)
 	cond.AddQualifier(qual1)
 	out, err := cond.Resolve(vars)
@@ -286,7 +286,7 @@ func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 
 func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attrs := NewAttributeFactory(packages.DefaultPackage, reg, reg)
 	data := map[string]interface{}{
 		"a": map[int]interface{}{
 			-1: []int32{2, 42},
@@ -300,13 +300,13 @@ func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 	vars, _ := NewActivation(data)
 
 	// (false ? a : b.c)[-1][1]
-	tv := res.AbsoluteAttribute(2, "a")
-	fv := res.OneofAttribute(3, "b")
-	qualC, _ := res.NewQualifier(nil, 4, "c")
+	tv := attrs.AbsoluteAttribute(2, "a")
+	fv := attrs.OneofAttribute(3, "b")
+	qualC, _ := attrs.NewQualifier(nil, 4, "c")
 	fv.AddQualifier(qualC)
-	cond := res.ConditionalAttribute(1, &evalConst{val: types.False}, tv, fv)
-	qualNeg1, _ := res.NewQualifier(nil, 5, int64(-1))
-	qual1, _ := res.NewQualifier(nil, 6, int64(1))
+	cond := attrs.ConditionalAttribute(1, &evalConst{val: types.False}, tv, fv)
+	qualNeg1, _ := attrs.NewQualifier(nil, 5, int64(-1))
+	qual1, _ := attrs.NewQualifier(nil, 6, int64(1))
 	cond.AddQualifier(qualNeg1)
 	cond.AddQualifier(qual1)
 	out, err := cond.Resolve(vars)
@@ -320,19 +320,19 @@ func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 
 func TestAttributes_ConditionalAttr_ErrorUnknown(t *testing.T) {
 	reg := types.NewRegistry()
-	res := NewResolver(packages.DefaultPackage, reg, reg)
+	attrs := NewAttributeFactory(packages.DefaultPackage, reg, reg)
 
 	// err ? a : b
-	tv := res.AbsoluteAttribute(2, "a")
-	fv := res.OneofAttribute(3, "b")
-	cond := res.ConditionalAttribute(1, &evalConst{val: types.NewErr("test error")}, tv, fv)
+	tv := attrs.AbsoluteAttribute(2, "a")
+	fv := attrs.OneofAttribute(3, "b")
+	cond := attrs.ConditionalAttribute(1, &evalConst{val: types.NewErr("test error")}, tv, fv)
 	out, err := cond.Resolve(EmptyActivation())
 	if err == nil {
 		t.Errorf("Got %v, wanted error", out)
 	}
 
 	// unk ? a : b
-	condUnk := res.ConditionalAttribute(1, &evalConst{val: types.Unknown{1}}, tv, fv)
+	condUnk := attrs.ConditionalAttribute(1, &evalConst{val: types.Unknown{1}}, tv, fv)
 	out, err = condUnk.Resolve(EmptyActivation())
 	if err != nil {
 		t.Fatal(err)
@@ -345,8 +345,8 @@ func TestAttributes_ConditionalAttr_ErrorUnknown(t *testing.T) {
 
 func TestResolver_CustomQualifier(t *testing.T) {
 	reg := types.NewRegistry()
-	res := &custResolver{
-		Resolver: NewResolver(packages.DefaultPackage, reg, reg),
+	attrs := &custAttrFactory{
+		AttributeFactory: NewAttributeFactory(packages.DefaultPackage, reg, reg),
 	}
 	msg := &proto3pb.TestAllTypes_NestedMessage{
 		Bb: 123,
@@ -354,8 +354,8 @@ func TestResolver_CustomQualifier(t *testing.T) {
 	vars, _ := NewActivation(map[string]interface{}{
 		"msg": msg,
 	})
-	attr := res.AbsoluteAttribute(1, "msg")
-	qualBB, _ := res.NewQualifier(&exprpb.Type{
+	attr := attrs.AbsoluteAttribute(1, "msg")
+	qualBB, _ := attrs.NewQualifier(&exprpb.Type{
 		TypeKind: &exprpb.Type_MessageType{
 			MessageType: "google.expr.proto3.test.TestAllTypes.NestedMessage",
 		},
@@ -372,8 +372,8 @@ func TestResolver_CustomQualifier(t *testing.T) {
 
 func BenchmarkResolver_CustomQualifier(b *testing.B) {
 	reg := types.NewRegistry()
-	res := &custResolver{
-		Resolver: NewResolver(packages.DefaultPackage, reg, reg),
+	attrs := &custAttrFactory{
+		AttributeFactory: NewAttributeFactory(packages.DefaultPackage, reg, reg),
 	}
 	msg := &proto3pb.TestAllTypes_NestedMessage{
 		Bb: 123,
@@ -381,8 +381,8 @@ func BenchmarkResolver_CustomQualifier(b *testing.B) {
 	vars, _ := NewActivation(map[string]interface{}{
 		"msg": msg,
 	})
-	attr := res.AbsoluteAttribute(1, "msg")
-	qualBB, _ := res.NewQualifier(&exprpb.Type{
+	attr := attrs.AbsoluteAttribute(1, "msg")
+	qualBB, _ := attrs.NewQualifier(&exprpb.Type{
 		TypeKind: &exprpb.Type_MessageType{
 			MessageType: "google.expr.proto3.test.TestAllTypes.NestedMessage",
 		},
@@ -393,16 +393,16 @@ func BenchmarkResolver_CustomQualifier(b *testing.B) {
 	}
 }
 
-type custResolver struct {
-	Resolver
+type custAttrFactory struct {
+	AttributeFactory
 }
 
-func (r *custResolver) NewQualifier(objType *exprpb.Type,
+func (r *custAttrFactory) NewQualifier(objType *exprpb.Type,
 	qualID int64, val interface{}) (Qualifier, error) {
 	if objType.GetMessageType() == "google.expr.proto3.test.TestAllTypes.NestedMessage" {
 		return &nestedMsgQualifier{id: qualID, field: val.(string)}, nil
 	}
-	return r.Resolver.NewQualifier(objType, qualID, val)
+	return r.AttributeFactory.NewQualifier(objType, qualID, val)
 }
 
 type nestedMsgQualifier struct {

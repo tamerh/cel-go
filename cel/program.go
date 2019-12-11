@@ -73,7 +73,7 @@ type prog struct {
 	dispatcher    interpreter.Dispatcher
 	interpreter   interpreter.Interpreter
 	interpretable interpreter.Interpretable
-	resolver      interpreter.Resolver
+	attrFactory   interpreter.AttributeFactory
 }
 
 // progFactory is a helper alias for marking a program creation factory function.
@@ -92,13 +92,13 @@ func newProgram(e *env, ast Ast, opts ...ProgramOption) (Program, error) {
 	// Build the dispatcher, interpreter, and default program value.
 	disp := interpreter.NewDispatcher()
 
-	// Ensure the default resolver is set after the adapter and provider are configured.
-	// The resolver may be overriden by using the CustomResolver.
-	resolver := interpreter.NewResolver(e.pkg, e.adapter, e.provider)
+	// Ensure the default attribute factory is set after the adapter and provider are
+	// configured. The attribute factory may be overriden by using the CustomAttributeFactory.
+	attrFactory := interpreter.NewAttributeFactory(e.pkg, e.adapter, e.provider)
 	p := &prog{
-		env:        e,
-		dispatcher: disp,
-		resolver:   resolver}
+		env:         e,
+		dispatcher:  disp,
+		attrFactory: attrFactory}
 
 	// Configure the program via the ProgramOption values.
 	var err error
@@ -112,7 +112,7 @@ func newProgram(e *env, ast Ast, opts ...ProgramOption) (Program, error) {
 		}
 	}
 
-	interp := interpreter.NewInterpreter(disp, e.pkg, e.provider, e.adapter, p.resolver)
+	interp := interpreter.NewInterpreter(disp, e.pkg, e.provider, e.adapter, p.attrFactory)
 	p.interpreter = interp
 
 	// Translate the EvalOption flags into InterpretableDecorator instances.

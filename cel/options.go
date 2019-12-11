@@ -221,19 +221,19 @@ func Globals(vars interface{}) ProgramOption {
 	}
 }
 
-// CustomResolver adjusts the variable and field resolution behavior of the Program.
+// CustomAttributeFactory adjusts the variable and field resolution behavior of the Program.
 //
 // An expression containing a field references and/or indexing expressions is considered an
 // Attribute. An Attribute is a variable or object reference with zero or more Qualifier that
-// values determine which piece of data is relevant to the computation. When an Attribute is
-// encountered, the runtime uses a Resolver to determine how to map from the Attribute to a
-// concrete value.
+// values determine which piece of data is relevant to the computation. When an Attribute
+// expression is encountered, the runtime resolves the Attribute to a concrete value.
 //
-// A Resolver may be generic or it may be deeply aware of the objects which can appear within
-// CEL expressions. By default a generic Resolver is created if a custom one is not set.
-func CustomResolver(resolver interpreter.Resolver) ProgramOption {
+// An AttributeFactory may be generic or it may be deeply aware of the objects which can appear
+// within CEL expressions. By default a generic AttributeFactory is created if a custom one is not
+// set.
+func CustomAttributeFactory(attrs interpreter.AttributeFactory) ProgramOption {
 	return func(p *prog) (*prog, error) {
-		p.resolver = resolver
+		p.attrFactory = attrs
 		return p, nil
 	}
 }
