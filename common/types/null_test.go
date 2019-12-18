@@ -64,11 +64,14 @@ func TestNull_ConvertToNative(t *testing.T) {
 
 func TestNull_ConvertToType(t *testing.T) {
 	if !NullValue.ConvertToType(NullType).Equal(NullValue).(Bool) {
-		t.Error("Fail to get NullType of NullValue.")
+		t.Error("Failed to get NullType of NullValue.")
 	}
 
 	if !NullValue.ConvertToType(StringType).Equal(String("null")).(Bool) {
-		t.Error("Fail to get StringType of NullValue.")
+		t.Error("Failed to get StringType of NullValue.")
+	}
+	if !NullValue.ConvertToType(TypeType).Equal(NullType).(Bool) {
+		t.Error("Failed to convert NullValue to type.")
 	}
 }
 
