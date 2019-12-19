@@ -89,7 +89,7 @@ type progGen struct {
 //
 // If the program cannot be configured the prog will be nil, with a non-nil error response.
 func newProgram(e *env, ast Ast, opts ...ProgramOption) (Program, error) {
-	// Build the dispatcher, interpreter, and default program value.
+	// Build the dispatcher, interpreter, resolver, and default program value.
 	disp := interpreter.NewDispatcher()
 
 	// Ensure the default attribute factory is set after the adapter and provider are

@@ -40,7 +40,10 @@ type protoObj struct {
 // NewObject returns an object based on a proto.Message value which handles
 // conversion between protobuf type values and expression type values.
 // Objects support indexing and iteration.
-// Note:  only uses default Db.
+//
+// Note: the type value is pulled from the list of registered types within the
+// type provider. If the proto type is not registered within the type provider,
+// then this will result in an error within the type adapter / provider.
 func NewObject(adapter ref.TypeAdapter,
 	typeDesc *pb.TypeDescription,
 	typeValue *TypeValue,

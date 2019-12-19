@@ -643,7 +643,8 @@ var (
 		// pb2 primitive fields may have default values set.
 		{
 			name: "select_pb2_primitive_fields",
-			expr: `a.single_int32 == -32
+			expr: `!has(a.single_int32)
+			&& a.single_int32 == -32
 			&& a.single_int64 == -64
 			&& a.single_uint32 == 32u
 			&& a.single_uint64 == 64u

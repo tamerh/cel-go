@@ -70,7 +70,8 @@ func (td *TypeDescription) ReflectType() reflect.Type {
 	return *td.getMetadata().reflectedType
 }
 
-// DefaultValue returns an empty instance of the proto message associated with the type.
+// DefaultValue returns an empty instance of the proto message associated with the type,
+// or nil for wrapper types.
 func (td *TypeDescription) DefaultValue() proto.Message {
 	val := td.getMetadata().emptyVal
 	if val == nil {
@@ -151,6 +152,9 @@ func (td *TypeDescription) makeMetadata() *typeMetadata {
 	return meta
 }
 
+// Create a new field description for the proto field descriptor associated with the given type.
+// The field properties should never not be found when performing reflection on the type unless
+// there are fundamental changes to the backing proto library behavior.
 func (td *TypeDescription) newFieldDesc(
 	tdType reflect.Type,
 	desc *descpb.FieldDescriptorProto,
@@ -160,12 +164,14 @@ func (td *TypeDescription) newFieldDesc(
 	getter, _ := tdType.MethodByName(getterName)
 	isProto3 := td.file.desc.GetSyntax() == "proto3"
 	var field *reflect.StructField
-	if isProto3 {
-		if tdType.Kind() == reflect.Ptr {
-			tdType = tdType.Elem()
-		}
-		f, _ := tdType.FieldByName(prop.Name)
+	if tdType.Kind() == reflect.Ptr {
+		tdType = tdType.Elem()
+	}
+	f, found := tdType.FieldByName(prop.Name)
+	if found {
 		field = &f
+		// The field will be not found for oneofs, but this is accounted for
+		// by checking the 'desc' value which provides this information.
 	}
 	fieldDesc := &FieldDescription{
 		desc:      desc,
@@ -224,7 +230,7 @@ func isWrapperType(desc *descpb.FieldDescriptorProto) bool {
 
 // FieldDescription holds metadata related to fields declared within a type.
 type FieldDescription struct {
-	// getter is the name of the accessor method to obtain the field value.
+	// getter is the reflected accessor method that obtains the field value.
 	getter reflect.Value
 	// field is the field location in a refValue
 	field *reflect.StructField
@@ -269,42 +275,61 @@ func (fd *FieldDescription) CheckedType() *exprpb.Type {
 
 // IsSet returns whether the field is set on the target value, per the proto presence conventions
 // of proto2 or proto3 accordingly.
+//
+// The input target may either be a reflect.Value or Go struct type.
 func (fd *FieldDescription) IsSet(target interface{}) bool {
 	t, ok := target.(reflect.Value)
 	if !ok {
 		t = reflect.ValueOf(target)
 	}
-	var fieldVal reflect.Value
+	// For the case where the field is not a oneof, test whether the field is set on the target
+	// value assuming it is a struct. A field that is not set will be one of the following values:
+	// - nil for message and primitive typed fields in proto2
+	// - nil for message typed fields in proto3
+	// - empty for primitive typed fields in proto3
 	if fd.field != nil && !fd.IsOneof() {
 		t = reflect.Indirect(t)
-		if t.Kind() == reflect.Struct {
-			fieldVal = t.FieldByIndex(fd.field.Index)
+		if t.Kind() != reflect.Struct {
+			return false
 		}
-	} else {
-		fieldVal = fd.getter.Call([]reflect.Value{t})[0]
+		return isFieldSet(t.FieldByIndex(fd.field.Index))
 	}
+	// When the field is nil or when the field is a oneof, call the accessor
+	// associated with this field name to determine whether the field value is
+	// the default.
+	fieldVal := fd.getter.Call([]reflect.Value{t})[0]
 	return isFieldSet(fieldVal)
 }
 
 // GetFrom returns the accessor method associated with the field on the proto generated struct.
 //
 // If the field is not set, the proto default value is returned instead.
+//
+// The input target may either be a reflect.Value or Go struct type.
 func (fd *FieldDescription) GetFrom(target interface{}) (interface{}, error) {
 	t, ok := target.(reflect.Value)
 	if !ok {
 		t = reflect.ValueOf(target)
 	}
 	var fieldVal reflect.Value
-	if fd.field != nil && !fd.IsOneof() {
+	if fd.isProto3 && fd.field != nil && !fd.IsOneof() {
+		// The target object should always be a struct.
 		t = reflect.Indirect(t)
-		if t.Kind() == reflect.Struct {
-			fieldVal = t.FieldByIndex(fd.field.Index)
+		if t.Kind() != reflect.Struct {
+			return nil, fmt.Errorf("unsupported field selection target: %T", target)
 		}
+		fieldVal = t.FieldByIndex(fd.field.Index)
 	} else {
+		// The accessor method must be used for proto2 in order to properly handle
+		// default values.
+		// Additionally, proto3 oneofs require the use of the accessor to get the proper value.
 		fieldVal = fd.getter.Call([]reflect.Value{t})[0]
 	}
 	if isFieldSet(fieldVal) {
-		return fieldVal.Interface(), nil
+		if fieldVal.CanInterface() {
+			return fieldVal.Interface(), nil
+		}
+		return reflect.Zero(fieldVal.Type()).Interface(), nil
 	}
 	if fd.IsWrapper() {
 		return structpb.NullValue_NULL_VALUE, nil
