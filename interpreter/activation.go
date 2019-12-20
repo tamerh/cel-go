@@ -48,8 +48,14 @@ func EmptyActivation() Activation {
 //
 // The input `bindings` may either be of type `Activation` or `map[string]interface{}`.
 //
-// When the bindings are a `map` form whose values are not of `ref.Val` type, the values will be
-// converted to CEL values (if possible) using the `types.DefaultTypeAdapter`.
+// Lazy bindings may be supplied in either of the following forms:
+// - func() interface{}
+// - func() ref.Val
+//
+// The output of the lazy binding will overwrite the variable reference in the internal map.
+//
+// Values which are not represented as ref.Val types on input may be adapted to a ref.Val using
+// the ref.TypeAdapter configured in the environment.
 func NewActivation(bindings interface{}) (Activation, error) {
 	if bindings == nil {
 		return nil, errors.New("bindings must be non-nil")
@@ -92,6 +98,11 @@ func (a *mapActivation) ResolveName(name string) (interface{}, bool) {
 		obj = fn()
 		a.bindings[name] = obj
 	}
+	fnRaw, isLazy := obj.(func() interface{})
+	if isLazy {
+		obj = fnRaw()
+		a.bindings[name] = obj
+	}
 	return obj, found
 }
 
@@ -124,12 +135,25 @@ func NewHierarchicalActivation(parent Activation, child Activation) Activation {
 // UnknownActivation returns an Activation that returns a 'types.Unknown' value for all requests
 // to ResolveName.
 func UnknownActivation() Activation {
+	// TODO: consider removing unknown activation if there is a way to specify fine-grained
+	// unknown attributes.
 	a, _ := PartialActivation(EmptyActivation())
 	return a
 }
 
 // PartialActivation returns an Activation that will resolve identifier names if present, otherwise
 // will return 'types.Unknown'.
+//
+// The input `bindings` may either be of type `Activation` or `map[string]interface{}`.
+//
+// Lazy bindings may be supplied in either of the following forms:
+// - func() interface{}
+// - func() ref.Val
+//
+// The output of the lazy binding will overwrite the variable reference in the internal map.
+//
+// Values which are not represented as ref.Val types on input may be adapted to a ref.Val using
+// the ref.TypeAdapter configured in the environment.
 func PartialActivation(bindings interface{}) (Activation, error) {
 	a, err := NewActivation(bindings)
 	if err != nil {

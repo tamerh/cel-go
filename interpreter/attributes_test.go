@@ -51,8 +51,8 @@ func TestAttributes_AbsoluteAttr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != "success" {
-		t.Errorf("Got %v, wanted success", out)
+	if out != types.String("success") {
+		t.Errorf("Got %v (%T), wanted success", out, out)
 	}
 }
 
@@ -82,7 +82,13 @@ func TestAttributes_RelativeAttr(t *testing.T) {
 	}
 	vars, _ := NewActivation(data)
 
-	// obj.a[-1][b]
+	// The relative attribute under test is applied to a map literal:
+	// {
+	//   a: {-1: [2, 42], b: 1}
+	//   b: 1
+	// }
+	//
+	// The expression being evaluated is: <map-literal>.a[-1][b] -> 42
 	op := &evalConst{
 		id:  1,
 		val: reg.NativeToValue(data),
@@ -114,7 +120,20 @@ func TestAttributes_RelativeAttr_OneOf(t *testing.T) {
 	}
 	vars, _ := NewActivation(data)
 
-	// obj.a[-1][b]
+	// The relative attribute under test is applied to a map literal:
+	// {
+	//   a: {-1: [2, 42], b: 1}
+	//   b: 1
+	// }
+	//
+	// The expression being evaluated is: <map-literal>.a[-1][b] -> 42
+	//
+	// However, since the test is validating what happens with maybe attributes
+	// the attribute resolution must also consider the following variations:
+	// - <map-literal>.a[-1][acme.ns.b]
+	// - <map-literal>.a[-1][acme.b]
+	//
+	// The correct behavior should yield the value of the last alternative.
 	op := &evalConst{
 		id:  1,
 		val: reg.NativeToValue(data),
@@ -124,7 +143,7 @@ func TestAttributes_RelativeAttr_OneOf(t *testing.T) {
 	qualNeg1, _ := attrs.NewQualifier(nil, 3, int64(-1))
 	attr.AddQualifier(qualA)
 	attr.AddQualifier(qualNeg1)
-	attr.AddQualifier(attrs.OneofAttribute(4, "b"))
+	attr.AddQualifier(attrs.MaybeAttribute(4, "b"))
 	out, err := attr.Resolve(vars)
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +165,17 @@ func TestAttributes_RelativeAttr_Conditional(t *testing.T) {
 	}
 	vars, _ := NewActivation(data)
 
-	// obj[a][-1][(cond ? b : c)[0]]
+	// The relative attribute under test is applied to a map literal:
+	// {
+	//   a: {-1: [2, 42], b: 1}
+	//   b: [0, 1],
+	//   c: {1, 0},
+	// }
+	//
+	// The expression being evaluated is:
+	// <map-literal>.a[-1][(false ? b : c)[0]] -> 42
+	//
+	// Effectively the same as saying <map-literal>.a[-1][c[0]]
 	cond := &evalConst{
 		id:  2,
 		val: types.False,
@@ -192,7 +221,30 @@ func TestAttributes_RelativeAttr_Relative(t *testing.T) {
 	}
 	vars, _ := NewActivation(data)
 
-	// a[-1][{1u: "first", 2u: "second", 3u: "third"}[b]]
+	// The environment declares the following variables:
+	// {
+	//   a: {
+	//     -1: {
+	//       "first": 1u,
+	//       "second": 2u,
+	//       "third": 3u,
+	//   b: 2u,
+	// }
+	//
+	// The map of input variables is also re-used as a map-literal <obj> in the expression.
+	//
+	// The relative object under test is the following map literal.
+	// <mp> {
+	//   1u: "first",
+	//   2u: "second",
+	//   3u: "third",
+	// }
+	//
+	// The expression under test is:
+	//   <obj>.a[-1][<mp>[b]]
+	//
+	// This is equivalent to:
+	//   <obj>.a[-1]["second"] -> 2u
 	obj := &evalConst{
 		id:  1,
 		val: reg.NativeToValue(data),
@@ -238,7 +290,7 @@ func TestAttributes_OneofAttr(t *testing.T) {
 	vars, _ := NewActivation(data)
 
 	// a.b -> should resolve to acme.ns.a.b per namespace resolution rules.
-	attr := attrs.OneofAttribute(1, "a")
+	attr := attrs.MaybeAttribute(1, "a")
 	qualB, _ := attrs.NewQualifier(nil, 2, "b")
 	attr.AddQualifier(qualB)
 	out, err := attr.Resolve(vars)
@@ -267,7 +319,7 @@ func TestAttributes_ConditionalAttr_TrueBranch(t *testing.T) {
 
 	// (true ? a : b.c)[-1][1]
 	tv := attrs.AbsoluteAttribute(2, "a")
-	fv := attrs.OneofAttribute(3, "b")
+	fv := attrs.MaybeAttribute(3, "b")
 	qualC, _ := attrs.NewQualifier(nil, 4, "c")
 	fv.AddQualifier(qualC)
 	cond := attrs.ConditionalAttribute(1, &evalConst{val: types.True}, tv, fv)
@@ -301,7 +353,7 @@ func TestAttributes_ConditionalAttr_FalseBranch(t *testing.T) {
 
 	// (false ? a : b.c)[-1][1]
 	tv := attrs.AbsoluteAttribute(2, "a")
-	fv := attrs.OneofAttribute(3, "b")
+	fv := attrs.MaybeAttribute(3, "b")
 	qualC, _ := attrs.NewQualifier(nil, 4, "c")
 	fv.AddQualifier(qualC)
 	cond := attrs.ConditionalAttribute(1, &evalConst{val: types.False}, tv, fv)
@@ -324,7 +376,7 @@ func TestAttributes_ConditionalAttr_ErrorUnknown(t *testing.T) {
 
 	// err ? a : b
 	tv := attrs.AbsoluteAttribute(2, "a")
-	fv := attrs.OneofAttribute(3, "b")
+	fv := attrs.MaybeAttribute(3, "b")
 	cond := attrs.ConditionalAttribute(1, &evalConst{val: types.NewErr("test error")}, tv, fv)
 	out, err := cond.Resolve(EmptyActivation())
 	if err == nil {

@@ -326,6 +326,7 @@ func (fd *FieldDescription) GetFrom(target interface{}) (interface{}, error) {
 		fieldVal = fd.getter.Call([]reflect.Value{t})[0]
 	}
 	if isFieldSet(fieldVal) {
+		// Return the field value assuming it is set. For proto3 the value may be a zero value.
 		if fieldVal.CanInterface() {
 			return fieldVal.Interface(), nil
 		}

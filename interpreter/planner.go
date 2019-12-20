@@ -139,7 +139,7 @@ func (p *planner) planIdent(expr *exprpb.Expr) (Interpretable, error) {
 	ident := expr.GetIdentExpr()
 	return &evalAttr{
 		adapter: p.adapter,
-		attr:    p.attrFactory.OneofAttribute(expr.Id, ident.Name),
+		attr:    p.attrFactory.MaybeAttribute(expr.Id, ident.Name),
 	}, nil
 }
 

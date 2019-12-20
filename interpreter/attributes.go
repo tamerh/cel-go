@@ -37,11 +37,11 @@ type AttributeFactory interface {
 	// that is resolved depends on the boolean evaluation of the input 'expr'.
 	ConditionalAttribute(id int64, expr Interpretable, t, f Attribute) Attribute
 
-	// OneofAttribute creates an attribute that refers to either a field selection or a namespaced
+	// MaybeAttribute creates an attribute that refers to either a field selection or a namespaced
 	// variable name.
 	//
 	// Only expressions which have not been type-checked may generate oneof attributes.
-	OneofAttribute(id int64, name string) Attribute
+	MaybeAttribute(id int64, name string) Attribute
 
 	// RelativeAttribute creates an attribute whose value is a qualification of a dynamic
 	// computation rather than a static variable reference.
@@ -58,7 +58,7 @@ type AttributeFactory interface {
 }
 
 // Qualifier marker interface for designating different qualifier values and where they appear
-// within expressions.
+// within field selections and index call expressions (`_[_]`).
 type Qualifier interface {
 	// ID where the qualifier appears within an expression.
 	ID() int64
@@ -128,10 +128,10 @@ func (r *attrFactory) ConditionalAttribute(id int64, expr Interpretable, t, f At
 	}
 }
 
-// OneofAttribute collects variants of unchecked AbsoluteAttribute values which could either be
+// MaybeAttribute collects variants of unchecked AbsoluteAttribute values which could either be
 // direct variable accesses or some combination of variable access with qualification.
-func (r *attrFactory) OneofAttribute(id int64, name string) Attribute {
-	return &oneofAttribute{
+func (r *attrFactory) MaybeAttribute(id int64, name string) Attribute {
+	return &maybeAttribute{
 		id: id,
 		attrs: []*absoluteAttribute{
 			&absoluteAttribute{
@@ -165,7 +165,7 @@ func (r *attrFactory) NewQualifier(objType *exprpb.Type,
 	qualID int64,
 	val interface{}) (Qualifier, error) {
 	// Before creating a new qualifier check to see if this is a protobuf message field access.
-	// If so, use the precomputed GetFrom qualification method ratehr than the standard
+	// If so, use the precomputed GetFrom qualification method rather than the standard
 	// stringQualifier.
 	str, isStr := val.(string)
 	if isStr && objType != nil && objType.GetMessageType() != "" {
@@ -183,7 +183,9 @@ func (r *attrFactory) NewQualifier(objType *exprpb.Type,
 }
 
 type absoluteAttribute struct {
-	id             int64
+	id int64
+	// namespaceNames represent the names the variable could have based on declared container
+	// (package) of the expression.
 	namespaceNames []string
 	qualifiers     []Qualifier
 	adapter        ref.TypeAdapter
@@ -208,8 +210,12 @@ func (a *absoluteAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 // If the variable name is not found an error is returned.
 func (a *absoluteAttribute) Resolve(vars Activation) (interface{}, error) {
 	for _, nm := range a.namespaceNames {
+		// If the variable is found, process it. Otherwise, wait until the checks to
+		// determine whether the type is unknown before returning.
 		op, found := vars.ResolveName(nm)
-		_, isUnk := op.(types.Unknown)
+		// TODO: when there is a way to specify unknown attributes with fine granularity,
+		// consider moving the unknown handling within 'found' block below.
+		unk, isUnk := op.(types.Unknown)
 		if found && !isUnk {
 			var err error
 			for _, qual := range a.qualifiers {
@@ -228,14 +234,17 @@ func (a *absoluteAttribute) Resolve(vars Activation) (interface{}, error) {
 			}
 			return nil, fmt.Errorf("no such attribute: %v", typ)
 		}
+		// If the variable was unknown, ensure it has a proper id associated with it before
+		// returning.
+		// Note, unknown types are not supported.
 		if isUnk {
-			return types.Unknown{a.ID()}, nil
+			return fmtUnknown(unk, a), nil
 		}
 	}
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
-// Qualify is an implementation of the AttributeFactory interface method.
+// Qualify is an implementation of the Qualifier interface method.
 func (a *absoluteAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
@@ -298,7 +307,7 @@ func (a *conditionalAttribute) Resolve(vars Activation) (interface{}, error) {
 	return nil, types.ValOrErr(val, "no such overload").Value().(error)
 }
 
-// Qualify is an implementation of the AttributeFactory interface method.
+// Qualify is an implementation of the Qualifier interface method.
 func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
@@ -315,7 +324,7 @@ func (a *conditionalAttribute) Qualify(vars Activation, obj interface{}) (interf
 	return qual.Qualify(vars, obj)
 }
 
-type oneofAttribute struct {
+type maybeAttribute struct {
 	id       int64
 	attrs    []*absoluteAttribute
 	adapter  ref.TypeAdapter
@@ -324,13 +333,30 @@ type oneofAttribute struct {
 }
 
 // ID is an implementation of the Attribute interface method.
-func (a *oneofAttribute) ID() int64 {
+func (a *maybeAttribute) ID() int64 {
 	return a.id
 }
 
-// AddQualifier adds a qualifier to each possible attribute variant in the oneof, and also creates
+// AddQualifier adds a qualifier to each possible attribute variant, and also creates
 // a new namespaced variable from the qualified value.
-func (a *oneofAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
+//
+// The algorithm for building the maybe attribute is as follows:
+//
+// 1. mb = NewMaybeAttribute(Attribute{[]string{"ns.a", "a"}})
+//    -- produces --
+//    maybe([]Attribute{
+//	      {[]string{"ns.a", "a"}, []qualifier{}},
+//    })
+//
+// 2. mb.AddQualifier("b")
+//    -- updates the state --
+//    maybe([]Attribute{
+//	     {[]string{"ns.a.b", "a.b"}, []qualifier{}}
+//       {[]string{"ns.a", "a"}, []qualifier{"b"}}
+//    })
+//
+// If none of the attributes within the maybe resolves a value, the result is an error.
+func (a *maybeAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 	str, isStr := qual.(*stringQualifier)
 	var augmentedNames []string
 	// First add the qualifier to all existing attributes in the oneof.
@@ -361,12 +387,15 @@ func (a *oneofAttribute) AddQualifier(qual Qualifier) (Attribute, error) {
 
 // Resolve follows the variable resolution rules to determine whether the attribute is a variable
 // or a field selection.
-func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
+func (a *maybeAttribute) Resolve(vars Activation) (interface{}, error) {
 	for _, attr := range a.attrs {
 		for _, nm := range attr.namespaceNames {
 			op, found := vars.ResolveName(nm)
+			// If the variable is found, process it. Otherwise, wait until the checks to
+			// determine whether the type is unknown before returning.
 			unk, isUnk := op.(types.Unknown)
-			// If the variable was found and not unknown, then attempt to qualify the value.
+			// TODO: when there is a way to specify unknown attributes with fine granularity,
+			// consider moving the unknown handling within 'found' block below.
 			if found && !isUnk {
 				var err error
 				for _, qual := range attr.qualifiers {
@@ -377,7 +406,7 @@ func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 				}
 				return op, nil
 			}
-			// Otherwise, attempt to find a type value.
+			// Attempt to resolve the qualified type name if the name is not a variable identifier.
 			typ, found := a.provider.FindIdent(nm)
 			if found {
 				if len(attr.qualifiers) == 0 {
@@ -385,18 +414,19 @@ func (a *oneofAttribute) Resolve(vars Activation) (interface{}, error) {
 				}
 				return nil, fmt.Errorf("no such attribute: %v", typ)
 			}
-			// If the type was not found and the value is unknown ensure it is returned with a reference
-			// to the current value.
+			// If the variable was unknown, ensure it has a proper id associated with it before
+			// returning.
+			// Note, unknown types are not supported.
 			if isUnk {
-				return fmtUnknown(unk, a), nil
+				return fmtUnknown(unk, attr), nil
 			}
 		}
 	}
 	return nil, fmt.Errorf("no such attribute: %v", a)
 }
 
-// Qualify is an implementation of the AttributeFactory interface method.
-func (a *oneofAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
+// Qualify is an implementation of the Qualifier interface method.
+func (a *maybeAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
 		return nil, err
@@ -453,7 +483,7 @@ func (a *relativeAttribute) Resolve(vars Activation) (interface{}, error) {
 	return obj, nil
 }
 
-// Qualify is an implementation of the AttributeFactory interface method.
+// Qualify is an implementation of the Qualifier interface method.
 func (a *relativeAttribute) Qualify(vars Activation, obj interface{}) (interface{}, error) {
 	val, err := a.Resolve(vars)
 	if err != nil {
@@ -593,6 +623,10 @@ func (q *intQualifier) Qualify(vars Activation, obj interface{}) (interface{}, e
 	isKey := false
 	isIndex := false
 	switch o := obj.(type) {
+	// The specialized map types supported by an int qualifier are considerably fewer than the set
+	// of specialized map types supported by string qualifiers since they are less frequently used
+	// than string-based map keys. Additional specializations may be added in the future if
+	// desired.
 	case map[int]interface{}:
 		isMap = true
 		obj, isKey = o[int(i)]
@@ -696,6 +730,10 @@ func (q *uintQualifier) Qualify(vars Activation, obj interface{}) (interface{}, 
 	isMap := false
 	isKey := false
 	switch o := obj.(type) {
+	// The specialized map types supported by a uint qualifier are considerably fewer than the set
+	// of specialized map types supported by string qualifiers since they are less frequently used
+	// than string-based map keys. Additional specializations may be added in the future if
+	// desired.
 	case map[uint]interface{}:
 		isMap = true
 		obj, isKey = o[uint(u)]
@@ -740,27 +778,11 @@ func (q *boolQualifier) Qualify(vars Activation, obj interface{}) (interface{}, 
 	b := q.value
 	isKey := false
 	switch o := obj.(type) {
+	// The specialized map types supported by a bool qualifier are considerably fewer than the set
+	// of specialized map types supported by string qualifiers since they are less frequently used
+	// than string-based map keys. Additional specializations may be added in the future if
+	// desired.
 	case map[bool]interface{}:
-		obj, isKey = o[b]
-	case map[bool]bool:
-		obj, isKey = o[b]
-	case map[bool]string:
-		obj, isKey = o[b]
-	case map[bool]int:
-		obj, isKey = o[b]
-	case map[bool]int32:
-		obj, isKey = o[b]
-	case map[bool]int64:
-		obj, isKey = o[b]
-	case map[bool]uint:
-		obj, isKey = o[b]
-	case map[bool]uint32:
-		obj, isKey = o[b]
-	case map[bool]uint64:
-		obj, isKey = o[b]
-	case map[bool]float32:
-		obj, isKey = o[b]
-	case map[bool]float64:
 		obj, isKey = o[b]
 	case types.Unknown:
 		return o, nil
@@ -800,11 +822,7 @@ func (q *fieldQualifier) Qualify(vars Activation, obj interface{}) (interface{},
 	if rv, ok := obj.(ref.Val); ok {
 		obj = rv.Value()
 	}
-	v, err := q.FieldType.GetFrom(obj)
-	if err != nil {
-		return nil, err
-	}
-	return v, nil
+	return q.FieldType.GetFrom(obj)
 }
 
 // fmtUnknown ensure that unknown values are annotated with the qualifier id where they are
