@@ -20,8 +20,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/google/cel-go/common/overloads"
-	"github.com/google/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/overloads"
+	"github.com/tamerh/cel-go/common/types/ref"
 
 	dpb "github.com/golang/protobuf/ptypes/duration"
 	structpb "github.com/golang/protobuf/ptypes/struct"

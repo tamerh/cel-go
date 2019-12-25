@@ -18,9 +18,9 @@
 package interpreter
 
 import (
-	"github.com/google/cel-go/common/packages"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/interpreter/functions"
+	"github.com/tamerh/cel-go/common/packages"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/interpreter/functions"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )

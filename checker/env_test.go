@@ -18,10 +18,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/common/overloads"
-	"github.com/google/cel-go/common/packages"
-	"github.com/google/cel-go/common/types"
+	"github.com/tamerh/cel-go/checker/decls"
+	"github.com/tamerh/cel-go/common/overloads"
+	"github.com/tamerh/cel-go/common/packages"
+	"github.com/tamerh/cel-go/common/types"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 

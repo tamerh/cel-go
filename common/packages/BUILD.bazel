@@ -7,7 +7,7 @@ package(
 
 go_library(
     name = "go_default_library",
-    importpath = "github.com/google/cel-go/common/packages",
+    importpath = "github.com/tamerh/cel-go/common/packages",
     srcs = [
         "packager.go",
     ],

@@ -45,8 +45,8 @@ environment option:
 
 ```go
 import(
-    "github.com/google/cel-go/cel"
-    "github.com/google/cel-go/checker/decls"
+    "github.com/tamerh/cel-go/cel"
+    "github.com/tamerh/cel-go/checker/decls"
 )
 
 env, err := cel.NewEnv(

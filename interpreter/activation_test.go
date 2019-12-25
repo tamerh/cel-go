@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/common/types/ref"
 )
 
 func TestActivation(t *testing.T) {

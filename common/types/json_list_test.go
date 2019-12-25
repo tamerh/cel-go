@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/cel-go/common/types/traits"
+	"github.com/tamerh/cel-go/common/types/traits"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"

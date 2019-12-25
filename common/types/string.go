@@ -24,9 +24,9 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/google/cel-go/common/overloads"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"github.com/tamerh/cel-go/common/overloads"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types/traits"
 
 	structpb "github.com/golang/protobuf/ptypes/struct"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"

@@ -17,11 +17,11 @@ package interpreter
 import (
 	"testing"
 
-	"github.com/google/cel-go/common/debug"
-	"github.com/google/cel-go/common/operators"
-	"github.com/google/cel-go/common/packages"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/test"
+	"github.com/tamerh/cel-go/common/debug"
+	"github.com/tamerh/cel-go/common/operators"
+	"github.com/tamerh/cel-go/common/packages"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/test"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )

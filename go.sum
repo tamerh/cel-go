@@ -13,6 +13,8 @@ github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfb
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.2 h1:6nsPYzhq5kReh6QImI3k5qWzO4PEbvbIW2cwSfR/6xs=
 github.com/golang/protobuf v1.3.2/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
+github.com/google/cel-go v0.3.2 h1:72Lj/nrfpWSJkuXdeEGB/7jfdwVFtV8kPJSL2Mt9rog=
+github.com/google/cel-go v0.3.2/go.mod h1:DoRSdzaJzNiP1lVuWhp/RjSnHLDQr/aNPlyqSBasBqA=
 github.com/google/cel-spec v0.3.0 h1:pyNjzTVK5qHTDr48x/0HAhebeFYryZpBXV2r7pzKMX4=
 github.com/google/cel-spec v0.3.0/go.mod h1:MjQm800JAGhOZXI7vatnVpmIaFTR6L8FHcKk+piiKpI=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2 h1:VklqNMn3ovrHsnt90PveolxSbWFaJdECFbxSq0Mqo2M=

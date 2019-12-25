@@ -14,7 +14,7 @@
 
 package types
 
-import "github.com/google/cel-go/common/types/ref"
+import "github.com/tamerh/cel-go/common/types/ref"
 
 var (
 	// DynType singleton.

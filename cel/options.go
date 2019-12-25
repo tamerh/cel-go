@@ -18,11 +18,11 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/cel-go/common/packages"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/interpreter"
-	"github.com/google/cel-go/interpreter/functions"
-	"github.com/google/cel-go/parser"
+	"github.com/tamerh/cel-go/common/packages"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/interpreter"
+	"github.com/tamerh/cel-go/interpreter/functions"
+	"github.com/tamerh/cel-go/parser"
 
 	descpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"

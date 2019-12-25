@@ -15,10 +15,10 @@
 package interpreter
 
 import (
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
-	"github.com/google/cel-go/interpreter/functions"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types/traits"
+	"github.com/tamerh/cel-go/interpreter/functions"
 )
 
 // Interpretable can accept a given Activation and produce a value along with

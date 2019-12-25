@@ -19,7 +19,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/cel-go/checker/decls"
+	"github.com/tamerh/cel-go/checker/decls"
 )
 
 func TestIO_AstToProto(t *testing.T) {

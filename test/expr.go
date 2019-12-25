@@ -17,7 +17,7 @@ package test
 import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/struct"
-	"github.com/google/cel-go/common/operators"
+	"github.com/tamerh/cel-go/common/operators"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )

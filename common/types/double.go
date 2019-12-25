@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types/traits"
 
 	"github.com/golang/protobuf/ptypes"
 

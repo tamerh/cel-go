@@ -11,7 +11,7 @@ go_library(
         "functions.go",
         "standard.go",
     ],
-    importpath = "github.com/google/cel-go/interpreter/functions",
+    importpath = "github.com/tamerh/cel-go/interpreter/functions",
     deps = [
         "//common/operators:go_default_library",
         "//common/overloads:go_default_library",

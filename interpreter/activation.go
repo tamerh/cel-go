@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/common/types/ref"
 )
 
 // Activation used to resolve identifiers by name and references by id.

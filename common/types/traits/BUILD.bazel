@@ -21,7 +21,7 @@ go_library(
         "sizer.go",
         "traits.go",
     ],
-    importpath = "github.com/google/cel-go/common/types/traits",
+    importpath = "github.com/tamerh/cel-go/common/types/traits",
     deps = [
         "//common/types/ref:go_default_library",
     ],

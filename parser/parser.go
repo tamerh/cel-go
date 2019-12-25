@@ -23,9 +23,9 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/operators"
-	"github.com/google/cel-go/parser/gen"
+	"github.com/tamerh/cel-go/common"
+	"github.com/tamerh/cel-go/common/operators"
+	"github.com/tamerh/cel-go/parser/gen"
 
 	structpb "github.com/golang/protobuf/ptypes/struct"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"

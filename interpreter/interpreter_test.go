@@ -22,22 +22,22 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/packages"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
-	"github.com/google/cel-go/interpreter/functions"
-	"github.com/google/cel-go/parser"
+	"github.com/tamerh/cel-go/checker"
+	"github.com/tamerh/cel-go/checker/decls"
+	"github.com/tamerh/cel-go/common"
+	"github.com/tamerh/cel-go/common/packages"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types/traits"
+	"github.com/tamerh/cel-go/interpreter/functions"
+	"github.com/tamerh/cel-go/parser"
 
 	structpb "github.com/golang/protobuf/ptypes/struct"
 	tpb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
 
-	proto2pb "github.com/google/cel-go/test/proto2pb"
-	proto3pb "github.com/google/cel-go/test/proto3pb"
+	proto2pb "github.com/tamerh/cel-go/test/proto2pb"
+	proto3pb "github.com/tamerh/cel-go/test/proto3pb"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )

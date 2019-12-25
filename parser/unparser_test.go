@@ -19,7 +19,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/cel-go/common"
+	"github.com/tamerh/cel-go/common"
 )
 
 func TestUnparse_Identical(t *testing.T) {

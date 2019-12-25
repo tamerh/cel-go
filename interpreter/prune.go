@@ -15,9 +15,9 @@
 package interpreter
 
 import (
-	"github.com/google/cel-go/common/operators"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/operators"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/common/types/ref"
 
 	structpb "github.com/golang/protobuf/ptypes/struct"
 

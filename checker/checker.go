@@ -21,9 +21,9 @@ import (
 	"reflect"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/checker/decls"
+	"github.com/tamerh/cel-go/common"
+	"github.com/tamerh/cel-go/common/types/ref"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )

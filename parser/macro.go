@@ -17,8 +17,8 @@ package parser
 import (
 	"fmt"
 
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/operators"
+	"github.com/tamerh/cel-go/common"
+	"github.com/tamerh/cel-go/common/operators"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )

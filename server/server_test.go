@@ -20,10 +20,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/common/operators"
-	"github.com/google/cel-go/test"
-	"github.com/google/cel-spec/tools/celrpc"
+	"github.com/tamerh/cel-go/checker/decls"
+	"github.com/tamerh/cel-go/common/operators"
+	"github.com/tamerh/cel-go/test"
+	"github.com/tamerh/cel-spec/tools/celrpc"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )

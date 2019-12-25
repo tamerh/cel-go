@@ -14,7 +14,7 @@ go_library(
         "unescape.go",
         "unparser.go",
     ],
-    importpath = "github.com/google/cel-go/parser",
+    importpath = "github.com/tamerh/cel-go/parser",
     deps = [
         "//common:go_default_library",
         "//common/operators:go_default_library",

@@ -21,16 +21,16 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"github.com/tamerh/cel-go/cel"
+	"github.com/tamerh/cel-go/common"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types/traits"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	test2pb "github.com/google/cel-spec/proto/test/v1/proto2/test_all_types"
-	test3pb "github.com/google/cel-spec/proto/test/v1/proto3/test_all_types"
+	test2pb "github.com/tamerh/cel-spec/proto/test/v1/proto2/test_all_types"
+	test3pb "github.com/tamerh/cel-spec/proto/test/v1/proto3/test_all_types"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	rpc "google.golang.org/genproto/googleapis/rpc/status"
 )

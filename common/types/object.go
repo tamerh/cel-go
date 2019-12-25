@@ -22,8 +22,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/google/cel-go/common/types/pb"
-	"github.com/google/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types/pb"
+	"github.com/tamerh/cel-go/common/types/ref"
 
 	structpb "github.com/golang/protobuf/ptypes/struct"
 )

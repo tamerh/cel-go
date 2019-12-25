@@ -19,7 +19,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	proto3pb "github.com/google/cel-go/test/proto3pb"
+	proto3pb "github.com/tamerh/cel-go/test/proto3pb"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 

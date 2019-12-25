@@ -15,10 +15,10 @@
 package interpreter
 
 import (
-	"github.com/google/cel-go/common/overloads"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"github.com/tamerh/cel-go/common/overloads"
+	"github.com/tamerh/cel-go/common/types"
+	"github.com/tamerh/cel-go/common/types/ref"
+	"github.com/tamerh/cel-go/common/types/traits"
 )
 
 // InterpretableDecorator is a functional interface for decorating or replacing

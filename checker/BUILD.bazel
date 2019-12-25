@@ -31,7 +31,7 @@ go_library(
         "@io_bazel_rules_go//proto/wkt:struct_go_proto",
         "@org_golang_google_genproto//googleapis/api/expr/v1alpha1:go_default_library",
     ],
-    importpath = "github.com/google/cel-go/checker",
+    importpath = "github.com/tamerh/cel-go/checker",
     visibility = ["//visibility:public"],
 )
 
